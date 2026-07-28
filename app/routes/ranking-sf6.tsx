@@ -575,7 +575,7 @@ export default function RankingSF6() {
                                         <option value="">Selecciona Retador...</option>
                                         {jugadoresOrdenadosPorRango.map((j) => (
                                             <option key={j.id} value={j.id}>
-                                                {j.nombre}
+                                                #{j.rangoActual} {j.nombre}
                                             </option>
                                         ))}
                                     </select>
@@ -585,7 +585,7 @@ export default function RankingSF6() {
                                         <option value="">Selecciona Retado...</option>
                                         {jugadoresOrdenadosPorRango.map((j) => (
                                             <option key={j.id} value={j.id}>
-                                                {j.nombre}
+                                                #{j.rangoActual} {j.nombre}
                                             </option>
                                         ))}
                                     </select>

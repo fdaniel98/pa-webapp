@@ -8,6 +8,7 @@
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
     "isbot": "^5",
     "motion": "^12.42.2",
     "react": "^19.2.7",
