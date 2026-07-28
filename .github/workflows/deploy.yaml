@@ -36,10 +36,15 @@ jobs:
       - name: Build Application
         run: npm run build
 
+      - name: Prepare Pages Output
+        run: |
+          touch ./build/client/.nojekyll
+          cp ./build/client/index.html ./build/client/404.html
+
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: './build'
+          path: './build/client'
 
       - name: Deploy to GitHub Pages
         id: deployment
