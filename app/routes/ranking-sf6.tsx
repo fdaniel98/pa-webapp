@@ -1,4 +1,5 @@
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
+import {AnimatePresence, motion, Reorder} from "motion/react";
 import type {Route} from "./+types/ranking-sf6";
 
 export function meta({}: Route.MetaArgs) {
@@ -20,6 +21,7 @@ type Player = {
 };
 
 type HistorialEntry = {
+    id: number;
     fecha: string;
     texto: string;
 };
@@ -48,16 +50,8 @@ function initialPlayers(): Player[] {
     }));
 }
 
-// Solo lo que Tailwind no puede expresar: keyframes y el scrollbar personalizado.
+// Solo lo que Tailwind no puede expresar: el scrollbar personalizado (las transiciones las maneja Motion).
 const PAGE_CSS = `
-@keyframes sf6-tab-fade {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes sf6-modal-in {
-  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
 .sf6-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .sf6-scroll::-webkit-scrollbar-track { background: transparent; }
 .sf6-scroll::-webkit-scrollbar-thumb { background: #4E4E50; border-radius: 9999px; }
@@ -66,7 +60,7 @@ const PAGE_CSS = `
 
 type ModalState =
     | { type: "alert"; message: string }
-    | { type: "confirm"; message: string; onConfirm: () => void };
+    | { type: "confirm"; message: string; onConfirm: () => void; onCancel?: () => void };
 
 type TabKey = "ranking" | "retos" | "gestion";
 
@@ -91,6 +85,10 @@ const BTN_WIN_SM =
 const BTN_DANGER_SM =
     "rounded-md bg-[#C3073F] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#ff4757]";
 
+const TAP = {scale: 0.96};
+const HOVER = {scale: 1.03};
+const ROW_TRANSITION = {layout: {duration: 0.3, ease: "easeInOut" as const}, opacity: {duration: 0.15}};
+
 export default function RankingSF6() {
     const [mounted, setMounted] = useState(false);
     const [jugadores, setJugadores] = useState<Player[]>(initialPlayers);
@@ -102,16 +100,28 @@ export default function RankingSF6() {
     const [newPlayerName, setNewPlayerName] = useState("");
     const [modal, setModal] = useState<ModalState | null>(null);
     const [activeTab, setActiveTab] = useState<TabKey>("ranking");
+    const [dragPreview, setDragPreview] = useState<Player[] | null>(null);
+    const dragPreviewRef = useRef<Player[] | null>(null);
 
     function showAlert(message: string) {
         setModal({type: "alert", message});
     }
 
-    function showConfirm(message: string, onConfirm: () => void) {
-        setModal({type: "confirm", message, onConfirm});
+    function showConfirm(message: string, onConfirm: () => void, onCancel?: () => void) {
+        setModal({type: "confirm", message, onConfirm, onCancel});
     }
 
     function closeModal() {
+        if (modal?.type === "confirm") {
+            modal.onCancel?.();
+        }
+        setModal(null);
+    }
+
+    function confirmModal() {
+        if (modal?.type === "confirm") {
+            modal.onConfirm();
+        }
         setModal(null);
     }
 
@@ -132,8 +142,14 @@ export default function RankingSF6() {
         if (dataGuardada) {
             try {
                 const estado = JSON.parse(dataGuardada);
+                const historialCargado: HistorialEntry[] = estado.historial ?? [];
                 setJugadores(estado.jugadores ?? initialPlayers());
-                setHistorial(estado.historial ?? []);
+                setHistorial(
+                    historialCargado.map((h, index) => ({
+                        ...h,
+                        id: h.id ?? Date.now() - index,
+                    }))
+                );
                 setRetosVigentes(estado.retosVigentes ?? []);
             } catch {
                 setJugadores(initialPlayers());
@@ -244,7 +260,7 @@ export default function RankingSF6() {
         setRetosVigentes((prev) => prev.filter((r) => r.id !== retoId));
 
         setHistorial((prev) => [
-            {fecha: new Date().toLocaleDateString(), texto: `${ganador.nombre} derrotó a ${perdedor.nombre}`},
+            {id: Date.now(), fecha: new Date().toLocaleDateString(), texto: `${ganador.nombre} derrotó a ${perdedor.nombre}`},
             ...prev,
         ]);
     }
@@ -281,6 +297,7 @@ export default function RankingSF6() {
 
         setHistorial((prev) => [
             {
+                id: Date.now(),
                 fecha: new Date().toLocaleDateString(),
                 texto: `Nuevo retador ingresó: ${nombre} en el puesto #${nuevoRango}`
             },
@@ -317,7 +334,11 @@ export default function RankingSF6() {
                 setRetosVigentes((prev) => prev.filter((r) => r.retadorId !== id && r.retadoId !== id));
 
                 setHistorial((prev) => [
-                    {fecha: new Date().toLocaleDateString(), texto: `${jugador.nombre} fue removido del ranking.`},
+                    {
+                        id: Date.now(),
+                        fecha: new Date().toLocaleDateString(),
+                        texto: `${jugador.nombre} fue removido del ranking.`
+                    },
                     ...prev,
                 ]);
             }
@@ -346,8 +367,57 @@ export default function RankingSF6() {
     }
 
     const ahora = Date.now();
-    const jugadoresOrdenadosPorNombre = [...jugadores].sort((a, b) => a.nombre.localeCompare(b.nombre));
     const jugadoresOrdenadosPorRango = [...jugadores].sort((a, b) => a.rangoActual - b.rangoActual);
+    const filasVisibles = dragPreview ?? jugadoresOrdenadosPorRango;
+
+    function handleReorderPreview(newOrder: Player[]) {
+        dragPreviewRef.current = newOrder;
+        setDragPreview(newOrder);
+    }
+
+    function handleRowDragEnd(draggedItem: Player) {
+        const finalOrder = dragPreviewRef.current;
+        if (!finalOrder) return;
+
+        const fromIndex = jugadoresOrdenadosPorRango.findIndex((j) => j.id === draggedItem.id);
+        const toIndex = finalOrder.findIndex((j) => j.id === draggedItem.id);
+
+        if (fromIndex === toIndex || fromIndex === -1 || toIndex === -1) {
+            dragPreviewRef.current = null;
+            setDragPreview(null);
+            return;
+        }
+
+        const puestoAnterior = fromIndex + 1;
+        const puestoNuevo = toIndex + 1;
+
+        showConfirm(
+            `¿Confirmas mover a ${draggedItem.nombre} del puesto #${puestoAnterior} al puesto #${puestoNuevo}? El resto de jugadores se ajustará automáticamente.`,
+            () => {
+                setJugadores((prev) =>
+                    prev.map((j) => {
+                        const nuevoIndex = finalOrder.findIndex((f) => f.id === j.id);
+                        if (nuevoIndex === -1) return j;
+                        return {...j, rangoAnterior: j.rangoActual, rangoActual: nuevoIndex + 1};
+                    })
+                );
+                setHistorial((prev) => [
+                    {
+                        id: Date.now(),
+                        fecha: new Date().toLocaleDateString(),
+                        texto: `${draggedItem.nombre} fue movido del puesto #${puestoAnterior} al puesto #${puestoNuevo} manualmente.`,
+                    },
+                    ...prev,
+                ]);
+                dragPreviewRef.current = null;
+                setDragPreview(null);
+            },
+            () => {
+                dragPreviewRef.current = null;
+                setDragPreview(null);
+            }
+        );
+    }
 
     return (
         <div
@@ -362,21 +432,36 @@ export default function RankingSF6() {
                 <div className={`${PANEL} flex min-h-0 flex-col`}>
                     <div className="mb-4 flex shrink-0 gap-1 border-b-2 border-[#4E4E50]">
                         {TABS.map((tab) => (
-                            <button
+                            <motion.button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`-mb-0.5 whitespace-nowrap rounded-t-md border-b-2 px-5 py-3 text-xs font-bold uppercase tracking-wide transition-colors duration-200 md:text-sm ${
+                                whileHover={{scale: 1.02}}
+                                whileTap={TAP}
+                                className={`relative -mb-0.5 whitespace-nowrap rounded-t-md px-5 py-3 text-xs font-bold uppercase tracking-wide transition-colors duration-200 md:text-sm ${
                                     activeTab === tab.key
-                                        ? "border-[#F0C808] bg-white/5 text-[#F0C808]"
-                                        : "border-transparent text-gray-500 hover:bg-white/5 hover:text-gray-200"
+                                        ? "bg-white/5 text-[#F0C808]"
+                                        : "text-gray-500 hover:bg-white/5 hover:text-gray-200"
                                 }`}
                             >
                                 {tab.label}
-                            </button>
+                                {activeTab === tab.key && (
+                                    <motion.div
+                                        layoutId="tab-underline"
+                                        className="absolute inset-x-0 -bottom-0.5 h-0.5 bg-[#F0C808]"
+                                        transition={{type: "spring", stiffness: 500, damping: 35}}
+                                    />
+                                )}
+                            </motion.button>
                         ))}
                     </div>
 
-                    <div key={activeTab} className="flex min-h-0 flex-1 flex-col [animation:sf6-tab-fade_0.2s_ease]">
+                    <motion.div
+                        key={activeTab}
+                        initial={{opacity: 0, y: 8}}
+                        animate={{opacity: 1, y: 0}}
+                        transition={{duration: 0.2, ease: "easeOut"}}
+                        className="flex min-h-0 flex-1 flex-col"
+                    >
                         {activeTab === "ranking" && (
                             <div
                                 className="sf6-scroll min-h-0 flex-1 overflow-auto rounded-md border border-[#4E4E50]/60">
@@ -400,58 +485,83 @@ export default function RankingSF6() {
                                         </th>
                                     </tr>
                                     </thead>
-                                    <tbody>
-                                    {jugadoresOrdenadosPorRango.map((j) => {
-                                        const dif = j.rangoAnterior - j.rangoActual;
-                                        let cambioTexto = "-";
-                                        let cambioClase = "text-gray-500";
-                                        if (dif > 0) {
-                                            cambioTexto = `▲ +${dif}`;
-                                            cambioClase = "font-bold text-[#2ecc71]";
-                                        } else if (dif < 0) {
-                                            cambioTexto = `▼ ${dif}`;
-                                            cambioClase = "font-bold text-[#C3073F]";
-                                        }
+                                    <Reorder.Group as="tbody" axis="y" values={filasVisibles}
+                                                   onReorder={handleReorderPreview}>
+                                        <AnimatePresence mode="popLayout">
+                                            {filasVisibles.map((j) => {
+                                                const dif = j.rangoAnterior - j.rangoActual;
+                                                let cambioTexto = "-";
+                                                let cambioClase = "text-gray-500";
+                                                if (dif > 0) {
+                                                    cambioTexto = `▲ +${dif}`;
+                                                    cambioClase = "font-bold text-[#2ecc71]";
+                                                } else if (dif < 0) {
+                                                    cambioTexto = `▼ ${dif}`;
+                                                    cambioClase = "font-bold text-[#C3073F]";
+                                                }
 
-                                        let estadoNodo: React.ReactNode = <span
-                                            className="text-xs text-gray-400">Disponible</span>;
-                                        if (j.cooldownHasta && j.cooldownHasta > ahora) {
-                                            const diasCooldown = Math.ceil((j.cooldownHasta - ahora) / (1000 * 60 * 60 * 24));
-                                            estadoNodo = (
-                                                <span
-                                                    className="inline-flex rounded-full bg-[#F0C808]/15 px-2.5 py-1 text-xs font-semibold text-[#F0C808]">
+                                                let estadoNodo: React.ReactNode = <span
+                                                    className="text-xs text-gray-400">Disponible</span>;
+                                                if (j.cooldownHasta && j.cooldownHasta > ahora) {
+                                                    const diasCooldown = Math.ceil((j.cooldownHasta - ahora) / (1000 * 60 * 60 * 24));
+                                                    estadoNodo = (
+                                                        <span
+                                                            className="inline-flex rounded-full bg-[#F0C808]/15 px-2.5 py-1 text-xs font-semibold text-[#F0C808]">
                             Inmune: {diasCooldown}d
                           </span>
-                                            );
-                                        } else if (retosVigentes.some((r) => r.retadorId === j.id || r.retadoId === j.id)) {
-                                            estadoNodo = (
-                                                <span
-                                                    className="inline-flex rounded-full bg-[#3498db]/15 px-2.5 py-1 text-xs font-semibold text-[#3498db]">
+                                                    );
+                                                } else if (retosVigentes.some((r) => r.retadorId === j.id || r.retadoId === j.id)) {
+                                                    estadoNodo = (
+                                                        <span
+                                                            className="inline-flex rounded-full bg-[#3498db]/15 px-2.5 py-1 text-xs font-semibold text-[#3498db]">
                             En Combate
                           </span>
-                                            );
-                                        }
+                                                    );
+                                                }
 
-                                        return (
-                                            <tr key={j.id} className="transition-colors hover:bg-white/5">
-                                                <td className="border-b border-white/10 px-4 py-3 text-center font-mono text-gray-400">
-                                                    {j.rangoActual}
-                                                </td>
-                                                <td className="border-b border-white/10 px-4 py-3 font-semibold text-white">{j.nombre}</td>
-                                                <td className={`border-b border-white/10 px-4 py-3 text-center ${cambioClase}`}>
-                                                    {cambioTexto}
-                                                </td>
-                                                <td className="border-b border-white/10 px-4 py-3">{estadoNodo}</td>
-                                                <td className="border-b border-white/10 px-4 py-3 text-center">
-                                                    <button className={BTN_DANGER_SM}
-                                                            onClick={() => eliminarJugador(j.id)}>
-                                                        Borrar
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    </tbody>
+                                                return (
+                                                    <Reorder.Item
+                                                        as="tr"
+                                                        key={j.id}
+                                                        value={j}
+                                                        onDragEnd={() => handleRowDragEnd(j)}
+                                                        initial={{opacity: 0}}
+                                                        animate={{opacity: 1}}
+                                                        exit={{opacity: 0}}
+                                                        transition={ROW_TRANSITION}
+                                                        whileDrag={{
+                                                            scale: 1.01,
+                                                            backgroundColor: "rgba(240,200,8,0.08)",
+                                                            boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+                                                        }}
+                                                        className="cursor-grab transition-colors hover:bg-white/5"
+                                                    >
+                                                        <td className="border-b border-white/10 px-4 py-3 text-center font-mono text-gray-400">
+                          <span className="mr-2 select-none text-gray-600" aria-hidden="true">
+                            ⠿
+                          </span>
+                                                            {j.rangoActual}
+                                                        </td>
+                                                        <td className="border-b border-white/10 px-4 py-3 font-semibold text-white">{j.nombre}</td>
+                                                        <td className={`border-b border-white/10 px-4 py-3 text-center ${cambioClase}`}>
+                                                            {cambioTexto}
+                                                        </td>
+                                                        <td className="border-b border-white/10 px-4 py-3">{estadoNodo}</td>
+                                                        <td className="border-b border-white/10 px-4 py-3 text-center">
+                                                            <motion.button
+                                                                whileHover={HOVER}
+                                                                whileTap={TAP}
+                                                                className={BTN_DANGER_SM}
+                                                                onClick={() => eliminarJugador(j.id)}
+                                                            >
+                                                                Borrar
+                                                            </motion.button>
+                                                        </td>
+                                                    </Reorder.Item>
+                                                );
+                                            })}
+                                        </AnimatePresence>
+                                    </Reorder.Group>
                                 </table>
                             </div>
                         )}
@@ -463,7 +573,7 @@ export default function RankingSF6() {
                                     <select className={INPUT} value={challengerId}
                                             onChange={(e) => setChallengerId(e.target.value)}>
                                         <option value="">Selecciona Retador...</option>
-                                        {jugadoresOrdenadosPorNombre.map((j) => (
+                                        {jugadoresOrdenadosPorRango.map((j) => (
                                             <option key={j.id} value={j.id}>
                                                 {j.nombre}
                                             </option>
@@ -473,16 +583,17 @@ export default function RankingSF6() {
                                     <select className={INPUT} value={challengedId}
                                             onChange={(e) => setChallengedId(e.target.value)}>
                                         <option value="">Selecciona Retado...</option>
-                                        {jugadoresOrdenadosPorNombre.map((j) => (
+                                        {jugadoresOrdenadosPorRango.map((j) => (
                                             <option key={j.id} value={j.id}>
                                                 {j.nombre}
                                             </option>
                                         ))}
                                     </select>
                                 </div>
-                                <button className={BTN_PRIMARY} onClick={lanzarReto}>
+                                <motion.button whileHover={HOVER} whileTap={TAP} className={BTN_PRIMARY}
+                                               onClick={lanzarReto}>
                                     Lanzar Reto
-                                </button>
+                                </motion.button>
                             </div>
                         )}
 
@@ -499,141 +610,198 @@ export default function RankingSF6() {
                                     }}
                                     className={`${INPUT} w-64 text-center`}
                                 />
-                                <button className={BTN_BLUE} onClick={agregarJugador}>
+                                <motion.button whileHover={HOVER} whileTap={TAP} className={BTN_BLUE}
+                                               onClick={agregarJugador}>
                                     Agregar al Ranking
-                                </button>
+                                </motion.button>
                             </div>
                         )}
-                    </div>
+                    </motion.div>
                 </div>
 
                 <div className="sf6-scroll flex min-h-0 flex-col gap-5 overflow-y-auto">
                     <div className={PANEL}>
                         <h2 className={SECTION_TITLE}>Retos Vigentes</h2>
                         <ul className="space-y-2">
-                            {retosVigentes.length === 0 ? (
-                                <li className={EMPTY_ITEM}>No hay retos activos.</li>
-                            ) : (
-                                retosVigentes.map((r) => {
-                                    const retador = jugadores.find((j) => j.id === r.retadorId);
-                                    const retado = jugadores.find((j) => j.id === r.retadoId);
-                                    if (!retador || !retado) return null;
+                            <AnimatePresence mode="popLayout">
+                                {retosVigentes.length === 0 ? (
+                                    <motion.li key="empty" layout initial={{opacity: 0}} animate={{opacity: 1}}
+                                               exit={{opacity: 0}} className={EMPTY_ITEM}>
+                                        No hay retos activos.
+                                    </motion.li>
+                                ) : (
+                                    retosVigentes.map((r) => {
+                                        const retador = jugadores.find((j) => j.id === r.retadorId);
+                                        const retado = jugadores.find((j) => j.id === r.retadoId);
+                                        if (!retador || !retado) return null;
 
-                                    const diasRestantes = Math.ceil((r.expiraEn - ahora) / (1000 * 60 * 60 * 24));
-                                    const urgente = diasRestantes <= 2;
+                                        const diasRestantes = Math.ceil((r.expiraEn - ahora) / (1000 * 60 * 60 * 24));
+                                        const urgente = diasRestantes <= 2;
 
-                                    return (
-                                        <li
-                                            key={r.id}
-                                            className="flex flex-wrap items-center justify-between gap-3 rounded-r-md border-l-4 border-[#3498db] bg-[#3498db]/10 p-3"
-                                        >
-                                            <div className="text-sm">
-                                                <strong>{retador.nombre}</strong> <span
-                                                className="text-gray-400">#{retador.rangoActual}</span>{" "}
-                                                reta a <strong>{retado.nombre}</strong>{" "}
-                                                <span className="text-gray-400">#{retado.rangoActual}</span>
-                                                <div
-                                                    className={`mt-1 text-xs ${urgente ? "font-bold text-[#C3073F]" : "text-gray-400"}`}>
-                                                    Expira en: {diasRestantes} días
+                                        return (
+                                            <motion.li
+                                                key={r.id}
+                                                layout
+                                                initial={{opacity: 0, y: -8}}
+                                                animate={{opacity: 1, y: 0}}
+                                                exit={{opacity: 0, x: 8}}
+                                                transition={{duration: 0.2}}
+                                                className="flex flex-wrap items-center justify-between gap-3 rounded-r-md border-l-4 border-[#3498db] bg-[#3498db]/10 p-3"
+                                            >
+                                                <div className="text-sm">
+                                                    <strong>{retador.nombre}</strong> <span
+                                                    className="text-gray-400">#{retador.rangoActual}</span>{" "}
+                                                    reta a <strong>{retado.nombre}</strong>{" "}
+                                                    <span className="text-gray-400">#{retado.rangoActual}</span>
+                                                    <div
+                                                        className={`mt-1 text-xs ${urgente ? "font-bold text-[#C3073F]" : "text-gray-400"}`}>
+                                                        Expira en: {diasRestantes} días
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                <button className={BTN_WIN_SM}
-                                                        onClick={() => resolverReto(r.id, retador.id)}>
-                                                    Gana {retador.nombre}
-                                                </button>
-                                                <button className={BTN_WIN_SM}
-                                                        onClick={() => resolverReto(r.id, retado.id)}>
-                                                    Gana {retado.nombre}
-                                                </button>
-                                                <button className={BTN_DANGER_SM} onClick={() => cancelarReto(r.id)}>
-                                                    Cancelar
-                                                </button>
-                                            </div>
-                                        </li>
-                                    );
-                                })
-                            )}
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    <motion.button whileHover={HOVER} whileTap={TAP}
+                                                                   className={BTN_WIN_SM}
+                                                                   onClick={() => resolverReto(r.id, retador.id)}>
+                                                        Gana {retador.nombre}
+                                                    </motion.button>
+                                                    <motion.button whileHover={HOVER} whileTap={TAP}
+                                                                   className={BTN_WIN_SM}
+                                                                   onClick={() => resolverReto(r.id, retado.id)}>
+                                                        Gana {retado.nombre}
+                                                    </motion.button>
+                                                    <motion.button whileHover={HOVER} whileTap={TAP}
+                                                                   className={BTN_DANGER_SM}
+                                                                   onClick={() => cancelarReto(r.id)}>
+                                                        Cancelar
+                                                    </motion.button>
+                                                </div>
+                                            </motion.li>
+                                        );
+                                    })
+                                )}
+                            </AnimatePresence>
                         </ul>
                     </div>
 
                     <div className={PANEL}>
                         <h2 className={SECTION_TITLE}>Historial Reciente</h2>
                         <ul className="space-y-2">
-                            {historial.length === 0 ? (
-                                <li className={EMPTY_ITEM}>Sin actividad reciente.</li>
-                            ) : (
-                                historial.slice(0, 7).map((h, index) => (
-                                    <li key={index} className={LIST_ITEM}>
-                                        <span className="mb-0.5 block text-xs text-gray-400">{h.fecha}</span>
-                                        {h.texto}
-                                    </li>
-                                ))
-                            )}
+                            <AnimatePresence mode="popLayout">
+                                {historial.length === 0 ? (
+                                    <motion.li key="empty" layout initial={{opacity: 0}} animate={{opacity: 1}}
+                                               exit={{opacity: 0}} className={EMPTY_ITEM}>
+                                        Sin actividad reciente.
+                                    </motion.li>
+                                ) : (
+                                    historial.slice(0, 7).map((h) => (
+                                        <motion.li
+                                            key={h.id}
+                                            layout
+                                            initial={{opacity: 0, y: -8}}
+                                            animate={{opacity: 1, y: 0}}
+                                            exit={{opacity: 0, x: 8}}
+                                            transition={{duration: 0.2}}
+                                            className={LIST_ITEM}
+                                        >
+                                            <span className="mb-0.5 block text-xs text-gray-400">{h.fecha}</span>
+                                            {h.texto}
+                                        </motion.li>
+                                    ))
+                                )}
+                            </AnimatePresence>
                         </ul>
                     </div>
 
                     <div className={PANEL}>
                         <h2 className={SECTION_TITLE}>Enfriamiento (7 Días)</h2>
                         <ul className="mb-3 space-y-2">
-                            {(() => {
-                                const enCooldown = jugadores.filter((j) => j.cooldownHasta && j.cooldownHasta > ahora);
-                                if (enCooldown.length === 0) {
-                                    return <li className={EMPTY_ITEM}>Nadie posee inmunidad activa.</li>;
-                                }
-                                return enCooldown.map((j) => {
-                                    const diasCooldown = Math.ceil((j.cooldownHasta! - ahora) / (1000 * 60 * 60 * 24));
-                                    return (
-                                        <li key={j.id} className={LIST_ITEM}>
-                                            <strong>{j.nombre}</strong> <span
-                                            className="text-gray-400">- {diasCooldown} días de inmunidad</span>
-                                        </li>
-                                    );
-                                });
-                            })()}
+                            <AnimatePresence mode="popLayout">
+                                {(() => {
+                                    const enCooldown = jugadores.filter((j) => j.cooldownHasta && j.cooldownHasta > ahora);
+                                    if (enCooldown.length === 0) {
+                                        return (
+                                            <motion.li key="empty" layout initial={{opacity: 0}}
+                                                       animate={{opacity: 1}} exit={{opacity: 0}}
+                                                       className={EMPTY_ITEM}>
+                                                Nadie posee inmunidad activa.
+                                            </motion.li>
+                                        );
+                                    }
+                                    return enCooldown.map((j) => {
+                                        const diasCooldown = Math.ceil((j.cooldownHasta! - ahora) / (1000 * 60 * 60 * 24));
+                                        return (
+                                            <motion.li
+                                                key={j.id}
+                                                layout
+                                                initial={{opacity: 0, y: -8}}
+                                                animate={{opacity: 1, y: 0}}
+                                                exit={{opacity: 0, x: 8}}
+                                                transition={{duration: 0.2}}
+                                                className={LIST_ITEM}
+                                            >
+                                                <strong>{j.nombre}</strong> <span
+                                                className="text-gray-400">- {diasCooldown} días de inmunidad</span>
+                                            </motion.li>
+                                        );
+                                    });
+                                })()}
+                            </AnimatePresence>
                         </ul>
-                        <button
+                        <motion.button
+                            whileHover={HOVER}
+                            whileTap={TAP}
                             className="w-full rounded-md bg-[#c0392b] py-2.5 text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#C3073F]"
                             onClick={borrarTodoElStorage}
                         >
                             ⚠️ Reiniciar Todos Los Datos
-                        </button>
+                        </motion.button>
                     </div>
                 </div>
             </div>
 
-            {modal && (
-                <div
-                    className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/75 p-5"
-                    onClick={closeModal}
-                >
-                    <div
-                        className="w-full max-w-[420px] rounded-xl border border-[#4E4E50] border-t-4 border-t-[#F0C808] bg-[#141416] p-6 shadow-2xl [animation:sf6-modal-in_0.15s_ease-out]"
-                        onClick={(e) => e.stopPropagation()}
+            <AnimatePresence>
+                {modal && (
+                    <motion.div
+                        className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/75 p-5"
+                        onClick={closeModal}
+                        initial={{opacity: 0}}
+                        animate={{opacity: 1}}
+                        exit={{opacity: 0}}
+                        transition={{duration: 0.15}}
                     >
-                        <p className="mb-5 text-[15px] leading-relaxed text-white">{modal.message}</p>
-                        <div className="flex justify-end gap-2.5">
-                            {modal.type === "confirm" && (
-                                <button
-                                    className="rounded-md border border-[#4E4E50] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-300 transition-colors hover:border-white hover:text-white"
-                                    onClick={closeModal}
+                        <motion.div
+                            className="w-full max-w-[420px] rounded-xl border border-[#4E4E50] border-t-4 border-t-[#F0C808] bg-[#141416] p-6 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                            initial={{opacity: 0, y: -8, scale: 0.97}}
+                            animate={{opacity: 1, y: 0, scale: 1}}
+                            exit={{opacity: 0, y: -8, scale: 0.97}}
+                            transition={{duration: 0.18, ease: "easeOut"}}
+                        >
+                            <p className="mb-5 text-[15px] leading-relaxed text-white">{modal.message}</p>
+                            <div className="flex justify-end gap-2.5">
+                                {modal.type === "confirm" && (
+                                    <motion.button
+                                        whileHover={HOVER}
+                                        whileTap={TAP}
+                                        className="rounded-md border border-[#4E4E50] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-300 transition-colors hover:border-white hover:text-white"
+                                        onClick={closeModal}
+                                    >
+                                        Cancelar
+                                    </motion.button>
+                                )}
+                                <motion.button
+                                    whileHover={HOVER}
+                                    whileTap={TAP}
+                                    className="rounded-md bg-[#F0C808] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-black transition-colors hover:bg-white"
+                                    onClick={confirmModal}
                                 >
-                                    Cancelar
-                                </button>
-                            )}
-                            <button
-                                className="rounded-md bg-[#F0C808] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-black transition-colors hover:bg-white"
-                                onClick={() => {
-                                    if (modal.type === "confirm") modal.onConfirm();
-                                    closeModal();
-                                }}
-                            >
-                                {modal.type === "confirm" ? "Confirmar" : "Aceptar"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                                    {modal.type === "confirm" ? "Confirmar" : "Aceptar"}
+                                </motion.button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
