@@ -19,7 +19,7 @@ function Movimiento({antes, despues}: { antes: number; despues: number }) {
     const subio = despues < antes;
     const igual = despues === antes;
     return (
-        <span className={igual ? "text-gray-500" : subio ? "text-[#2ecc71]" : "text-[#C3073F]"}>
+        <span className={igual ? "text-gray-500" : subio ? "text-success" : "text-danger"}>
             #{antes} → #{despues}
         </span>
     );
@@ -36,14 +36,16 @@ export function MatchHistory({jugadores}: { jugadores: Player[] }) {
     const cargar = useCallback(async (filtro: string, offset = 0) => {
         setCargando(true);
         try {
-            const pagina = await fetchMatches({
-                playerId: filtro || undefined,
-                limit: PAGE_SIZE,
-                offset,
-            });
+            // Las dos consultas son independientes: en serie se sumaban sus
+            // latencias sin necesidad.
+            const [pagina, recordJugador] = await Promise.all([
+                fetchMatches({playerId: filtro || undefined, limit: PAGE_SIZE, offset}),
+                filtro ? fetchPlayerRecord(filtro) : Promise.resolve(null),
+            ]);
+
             setMatches((prev) => (offset === 0 ? pagina : [...prev, ...pagina]));
             setHayMas(pagina.length === PAGE_SIZE);
-            setRecord(filtro ? await fetchPlayerRecord(filtro) : null);
+            setRecord(recordJugador);
             setError(null);
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
@@ -69,7 +71,7 @@ export function MatchHistory({jugadores}: { jugadores: Player[] }) {
                         id="filtro-jugador"
                         value={playerId}
                         onChange={(e) => setPlayerId(e.target.value)}
-                        className={`${INPUT} w-64`}
+                        className={`${INPUT} w-full sm:w-64`}
                     >
                         <option value="">Todos los enfrentamientos</option>
                         {jugadores.map((j) => (
@@ -87,13 +89,13 @@ export function MatchHistory({jugadores}: { jugadores: Player[] }) {
             </div>
 
             {error && (
-                <p className="rounded-r-md border-l-4 border-[#C3073F] bg-[#C3073F]/10 px-3 py-2 text-xs text-[#ff8095]">
+                <p className="rounded-r-md border-l-4 border-danger bg-danger/10 px-3 py-2 text-xs text-danger-soft">
                     {error}
                 </p>
             )}
 
             {record && jugadorSeleccionado && (
-                <div className="grid grid-cols-2 gap-2 rounded-md border border-[#F0C808]/40 bg-[#F0C808]/5 p-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 rounded-md border border-brand/40 bg-brand/5 p-3 sm:grid-cols-4">
                     <Dato etiqueta="Puesto actual" valor={`#${jugadorSeleccionado.rangoActual}`}/>
                     <Dato etiqueta="Récord" valor={`${record.victorias}V - ${record.derrotas}D`}/>
                     <Dato etiqueta="Retos jugados" valor={String(record.jugados)}/>
@@ -124,14 +126,14 @@ export function MatchHistory({jugadores}: { jugadores: Player[] }) {
                                     {...LIST_ITEM_MOTION}
                                     className={`rounded-r-md border-l-4 bg-black/20 px-3 py-2 ${
                                         gano
-                                            ? "border-[#2ecc71]"
+                                            ? "border-success"
                                             : perdio
-                                                ? "border-[#C3073F]"
-                                                : "border-[#4E4E50]"
+                                                ? "border-danger"
+                                                : "border-line"
                                     }`}
                                 >
                                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                                        <span className="font-semibold text-[#2ecc71]">{m.ganadorNombre}</span>
+                                        <span className="font-semibold text-success">{m.ganadorNombre}</span>
                                         <span className="text-gray-500">venció a</span>
                                         <span className="font-semibold text-white">{m.perdedorNombre}</span>
                                         <span className="rounded bg-white/10 px-2 py-0.5 font-mono text-xs text-gray-200">
@@ -186,7 +188,7 @@ function Dato({etiqueta, valor}: { etiqueta: string; valor: string }) {
     return (
         <div>
             <p className="text-[11px] uppercase tracking-wide text-gray-500">{etiqueta}</p>
-            <p className="text-lg font-bold text-[#F0C808]">{valor}</p>
+            <p className="text-lg font-bold text-brand">{valor}</p>
         </div>
     );
 }

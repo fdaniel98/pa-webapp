@@ -66,7 +66,7 @@ export function ChallengeReport({reto, retador, retado, onReport, onCancel}: Cha
     return (
         <form
             onSubmit={enviar}
-            className="rounded-r-md border-l-4 border-[#3498db] bg-[#3498db]/10 p-3"
+            className="rounded-r-md border-l-4 border-info bg-info/10 p-3"
         >
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>
@@ -75,13 +75,13 @@ export function ChallengeReport({reto, retador, retado, onReport, onCancel}: Cha
                     <strong>{retado.nombre}</strong>{" "}
                     <span className="text-gray-400">#{retado.rangoActual}</span>
                 </span>
-                <span className={`text-xs ${diasRestantes <= 2 ? "font-bold text-[#C3073F]" : "text-gray-400"}`}>
+                <span className={`text-xs ${diasRestantes <= 2 ? "font-bold text-danger" : "text-gray-400"}`}>
                     Expira en {diasRestantes} día{diasRestantes === 1 ? "" : "s"}
                 </span>
             </div>
 
             {error && (
-                <p className="mb-3 rounded-r-md border-l-4 border-[#C3073F] bg-[#C3073F]/10 px-3 py-2 text-xs text-[#ff8095]">
+                <p className="mb-3 rounded-r-md border-l-4 border-danger bg-danger/10 px-3 py-2 text-xs text-danger-soft">
                     {error}
                 </p>
             )}

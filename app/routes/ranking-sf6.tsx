@@ -1,14 +1,27 @@
-import {useCallback, useEffect, useRef, useState} from "react";
+import {lazy, Suspense, useCallback, useEffect, useRef, useState} from "react";
 import {AnimatePresence, motion, Reorder} from "motion/react";
 import type {Route} from "./+types/ranking-sf6";
-import {AuditLog} from "~/components/audit-log";
 import {ChallengeReport} from "~/components/challenge-report";
 import {Footer} from "~/components/footer";
-import {MatchHistory} from "~/components/match-history";
-import {PlayerAdmin} from "~/components/player-admin";
-import {SettingsAdmin} from "~/components/settings-admin";
-import {UserAdmin} from "~/components/user-admin";
 import {useAuth} from "~/lib/auth";
+
+// Los paneles de cada pestaña se cargan al abrirlas. Casi todos son de admin, así
+// que un miembro ya no descarga la interfaz de administración que nunca verá.
+const MatchHistory = lazy(() =>
+    import("~/components/match-history").then((m) => ({default: m.MatchHistory}))
+);
+const PlayerAdmin = lazy(() =>
+    import("~/components/player-admin").then((m) => ({default: m.PlayerAdmin}))
+);
+const UserAdmin = lazy(() =>
+    import("~/components/user-admin").then((m) => ({default: m.UserAdmin}))
+);
+const AuditLog = lazy(() =>
+    import("~/components/audit-log").then((m) => ({default: m.AuditLog}))
+);
+const SettingsAdmin = lazy(() =>
+    import("~/components/settings-admin").then((m) => ({default: m.SettingsAdmin}))
+);
 import type {AppSetting} from "~/lib/settings";
 import {fetchSettings, NOTIFICACIONES_RETOS, setSetting} from "~/lib/settings";
 import type {MatchReport} from "~/lib/matches";
@@ -47,14 +60,6 @@ export function meta({}: Route.MetaArgs) {
         {name: "description", content: "Ranking y sistema de retos SF6 - Puello Academy"},
     ];
 }
-
-// Solo lo que Tailwind no puede expresar: el scrollbar personalizado (las transiciones las maneja Motion).
-const PAGE_CSS = `
-.sf6-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-.sf6-scroll::-webkit-scrollbar-track { background: transparent; }
-.sf6-scroll::-webkit-scrollbar-thumb { background: #4E4E50; border-radius: 9999px; }
-.sf6-scroll::-webkit-scrollbar-thumb:hover { background: #F0C808; }
-`;
 
 type ModalState =
     | { type: "alert"; message: string }
@@ -264,10 +269,9 @@ export default function RankingSF6() {
     if (loading) {
         return (
             <div
-                className="flex h-screen w-full items-center justify-center bg-[#0b0b0c] bg-[radial-gradient(circle,_#1a1a1d_0%,_#000000_100%)] font-sans text-white"
+                className="flex h-dvh w-full items-center justify-center page-bg font-sans text-white"
             >
-                <style>{PAGE_CSS}</style>
-                <p className="text-sm uppercase tracking-wide text-gray-400">Cargando ranking...</p>
+                    <p className="text-sm uppercase tracking-wide text-gray-400">Cargando ranking...</p>
             </div>
         );
     }
@@ -275,6 +279,11 @@ export default function RankingSF6() {
     const ahora = Date.now();
     const jugadoresOrdenadosPorRango = [...jugadores].sort((a, b) => a.rangoActual - b.rangoActual);
     const filasVisibles = dragPreview ?? jugadoresOrdenadosPorRango;
+
+    // Índices para no recorrer los arrays dentro de cada fila renderizada:
+    // sin esto, cada jugador barría todos los retos y cada reto todos los jugadores.
+    const jugadoresPorId = new Map(jugadores.map((j) => [j.id, j]));
+    const jugadoresEnReto = new Set(retosVigentes.flatMap((r) => [r.retadorId, r.retadoId]));
 
     function handleReorderPreview(newOrder: Player[]) {
         dragPreviewRef.current = newOrder;
@@ -316,23 +325,23 @@ export default function RankingSF6() {
         let cambioClase = "text-gray-500";
         if (dif > 0) {
             cambioTexto = `▲ +${dif}`;
-            cambioClase = "font-bold text-[#2ecc71]";
+            cambioClase = "font-bold text-success";
         } else if (dif < 0) {
             cambioTexto = `▼ ${dif}`;
-            cambioClase = "font-bold text-[#C3073F]";
+            cambioClase = "font-bold text-danger";
         }
 
         let estadoNodo: React.ReactNode = <span className="text-xs text-gray-400">Disponible</span>;
         if (j.cooldownHasta && j.cooldownHasta > ahora) {
             const diasCooldown = Math.ceil((j.cooldownHasta - ahora) / (1000 * 60 * 60 * 24));
             estadoNodo = (
-                <span className="inline-flex rounded-full bg-[#F0C808]/15 px-2.5 py-1 text-xs font-semibold text-[#F0C808]">
+                <span className="inline-flex rounded-full bg-brand/15 px-2.5 py-1 text-xs font-semibold text-brand">
                     Inmune: {diasCooldown}d
                 </span>
             );
-        } else if (retosVigentes.some((r) => r.retadorId === j.id || r.retadoId === j.id)) {
+        } else if (jugadoresEnReto.has(j.id)) {
             estadoNodo = (
-                <span className="inline-flex rounded-full bg-[#3498db]/15 px-2.5 py-1 text-xs font-semibold text-[#3498db]">
+                <span className="inline-flex rounded-full bg-info/15 px-2.5 py-1 text-xs font-semibold text-info">
                     En Combate
                 </span>
             );
@@ -369,20 +378,20 @@ export default function RankingSF6() {
 
     const encabezados = (
         <tr>
-            <th className="sticky top-0 z-10 rounded-tl-md bg-[#F0C808] px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-black">
+            <th className="sticky top-0 z-10 rounded-tl-md bg-brand px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-black">
                 #
             </th>
-            <th className="sticky top-0 z-10 bg-[#F0C808] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-black">
+            <th className="sticky top-0 z-10 bg-brand px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-black">
                 Jugador
             </th>
-            <th className="sticky top-0 z-10 bg-[#F0C808] px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-black">
+            <th className="sticky top-0 z-10 bg-brand px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-black">
                 Cambio
             </th>
-            <th className={`sticky top-0 z-10 bg-[#F0C808] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-black ${isAdmin ? "" : "rounded-tr-md"}`}>
+            <th className={`sticky top-0 z-10 bg-brand px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-black ${isAdmin ? "" : "rounded-tr-md"}`}>
                 Estado
             </th>
             {isAdmin && (
-                <th className="sticky top-0 z-10 rounded-tr-md bg-[#F0C808] px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-black">
+                <th className="sticky top-0 z-10 rounded-tr-md bg-brand px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-black">
                     Acción
                 </th>
             )}
@@ -391,11 +400,10 @@ export default function RankingSF6() {
 
     return (
         <div
-            className="flex h-screen w-full flex-col overflow-hidden bg-[#0b0b0c] bg-[radial-gradient(circle,_#1a1a1d_0%,_#000000_100%)] p-4 font-sans text-white md:p-6">
-            <style>{PAGE_CSS}</style>
+            className="flex min-h-dvh w-full flex-col page-bg p-4 font-sans text-white md:p-6 lg:h-dvh lg:overflow-hidden">
 
             <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 pb-4 md:pb-6">
-                <h1 className="flex-1 text-center text-2xl font-bold italic uppercase tracking-wide text-[#F0C808] md:text-3xl">
+                <h1 className="flex-1 text-center text-2xl font-bold italic uppercase tracking-wide text-brand md:text-3xl">
                     修 Ranking - Puello Academy
                 </h1>
                 <div className="flex items-center gap-3">
@@ -416,14 +424,14 @@ export default function RankingSF6() {
 
             {loadError && (
                 <div
-                    className="mx-auto mb-4 w-full max-w-[1700px] shrink-0 rounded-r-md border-l-4 border-[#C3073F] bg-[#C3073F]/10 px-3 py-2 text-sm text-[#ff8095]">
+                    className="mx-auto mb-4 w-full max-w-[1700px] shrink-0 rounded-r-md border-l-4 border-danger bg-danger/10 px-3 py-2 text-sm text-danger-soft">
                     No se pudo cargar el ranking: {loadError}
                 </div>
             )}
 
             {notifyError && (
                 <div
-                    className="mx-auto mb-4 flex w-full max-w-[1700px] shrink-0 items-center justify-between gap-3 rounded-r-md border-l-4 border-[#F0C808] bg-[#F0C808]/10 px-3 py-2 text-sm text-[#F0C808]">
+                    className="mx-auto mb-4 flex w-full max-w-[1700px] shrink-0 items-center justify-between gap-3 rounded-r-md border-l-4 border-brand bg-brand/10 px-3 py-2 text-sm text-brand">
                     <span>
                         El cambio se guardó, pero los correos quedaron pendientes: {notifyError}
                     </span>
@@ -439,20 +447,20 @@ export default function RankingSF6() {
             {/* minmax(0,…) evita que la tabla del ranking, al ser ancha, empuje y
                 estruje la columna lateral. */}
             <div
-                className="mx-auto grid w-full min-h-0 flex-1 max-w-[1700px] grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-6">
+                className="mx-auto grid w-full min-h-0 flex-1 max-w-[1700px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
                 <div className={`${PANEL} flex min-h-0 flex-col ${busy ? "pointer-events-none opacity-60" : ""}`}>
                     {/* flex-wrap es la red de seguridad: si alguna vez no caben,
                         las pestañas bajan de línea en vez de salirse del panel. */}
-                    <div className="mb-4 flex shrink-0 flex-wrap gap-1 border-b-2 border-[#4E4E50]">
+                    <div className="mb-4 flex shrink-0 flex-wrap gap-1 border-b-2 border-line">
                         {visibleTabs.map((tab) => (
                             <motion.button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
                                 whileHover={HOVER}
                                 whileTap={TAP}
-                                className={`relative -mb-0.5 whitespace-nowrap rounded-t-md px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide transition-colors duration-200 ${
+                                className={`relative -mb-0.5 min-h-11 whitespace-nowrap rounded-t-md px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide transition-colors duration-200 sm:min-h-0 ${
                                     activeTab === tab.key
-                                        ? "bg-white/5 text-[#F0C808]"
+                                        ? "bg-white/5 text-brand"
                                         : "text-gray-500 hover:bg-white/5 hover:text-gray-200"
                                 }`}
                             >
@@ -460,7 +468,7 @@ export default function RankingSF6() {
                                 {activeTab === tab.key && (
                                     <motion.div
                                         layoutId="tab-underline"
-                                        className="absolute inset-x-0 -bottom-0.5 h-0.5 bg-[#F0C808]"
+                                        className="absolute inset-x-0 -bottom-0.5 h-0.5 bg-brand"
                                         transition={SPRING}
                                     />
                                 )}
@@ -479,9 +487,12 @@ export default function RankingSF6() {
                         transition={{duration: DUR.fast, ease: EASE}}
                         className="flex min-h-0 flex-1 flex-col"
                     >
+                        <Suspense
+                            fallback={<p className="p-4 text-sm text-gray-500">Cargando panel...</p>}
+                        >
                         {activeTab === "ranking" && (
                             <div
-                                className="sf6-scroll min-h-0 flex-1 overflow-auto rounded-md border border-[#4E4E50]/60">
+                                className="sf6-scroll max-h-[60vh] min-h-0 flex-1 overflow-auto rounded-md border border-line/60 lg:max-h-none">
                                 <table className="w-full border-separate border-spacing-0 text-sm">
                                     <thead>{encabezados}</thead>
 
@@ -550,15 +561,15 @@ export default function RankingSF6() {
                                     Lanzar Reto
                                 </motion.button>
 
-                                <div className="mt-2 w-full border-t border-[#4E4E50] pt-4">
+                                <div className="mt-2 w-full border-t border-line pt-4">
                                     <h3 className={SECTION_TITLE}>Reportar resultados</h3>
                                     {retosVigentes.length === 0 ? (
                                         <p className={EMPTY_ITEM}>No hay retos pendientes de reportar.</p>
                                     ) : (
                                         <ul className="space-y-3">
                                             {retosVigentes.map((r) => {
-                                                const retador = jugadores.find((j) => j.id === r.retadorId);
-                                                const retado = jugadores.find((j) => j.id === r.retadoId);
+                                                const retador = jugadoresPorId.get(r.retadorId);
+                                                const retado = jugadoresPorId.get(r.retadoId);
                                                 if (!retador || !retado) return null;
 
                                                 return (
@@ -596,11 +607,12 @@ export default function RankingSF6() {
                         {activeTab === "config" && isAdmin && (
                             <SettingsAdmin ajustes={ajustes} onToggle={cambiarAjuste}/>
                         )}
+                        </Suspense>
                     </motion.div>
                     </AnimatePresence>
                 </div>
 
-                <div className="sf6-scroll flex min-h-0 flex-col gap-5 overflow-y-auto">
+                <div className="sf6-scroll flex min-h-0 flex-col gap-5 lg:overflow-y-auto">
                     <div className={PANEL}>
                         <h2 className={SECTION_TITLE}>Retos Vigentes</h2>
                         <ul className="space-y-2">
@@ -611,8 +623,8 @@ export default function RankingSF6() {
                                     </motion.li>
                                 ) : (
                                     retosVigentes.map((r) => {
-                                        const retador = jugadores.find((j) => j.id === r.retadorId);
-                                        const retado = jugadores.find((j) => j.id === r.retadoId);
+                                        const retador = jugadoresPorId.get(r.retadorId);
+                                        const retado = jugadoresPorId.get(r.retadoId);
                                         if (!retador || !retado) return null;
 
                                         const diasRestantes = Math.ceil((r.expiraEn - ahora) / (1000 * 60 * 60 * 24));
@@ -623,7 +635,7 @@ export default function RankingSF6() {
                                                 key={r.id}
                                                 layout
                                                 {...LIST_ITEM_MOTION}
-                                                className="flex flex-wrap items-center justify-between gap-3 rounded-r-md border-l-4 border-[#3498db] bg-[#3498db]/10 p-3"
+                                                className="flex flex-wrap items-center justify-between gap-3 rounded-r-md border-l-4 border-info bg-info/10 p-3"
                                             >
                                                 <div className="text-sm">
                                                     <strong>{retador.nombre}</strong> <span
@@ -631,7 +643,7 @@ export default function RankingSF6() {
                                                     reta a <strong>{retado.nombre}</strong>{" "}
                                                     <span className="text-gray-400">#{retado.rangoActual}</span>
                                                     <div
-                                                        className={`mt-1 text-xs ${urgente ? "font-bold text-[#C3073F]" : "text-gray-400"}`}>
+                                                        className={`mt-1 text-xs ${urgente ? "font-bold text-danger" : "text-gray-400"}`}>
                                                         Expira en: {diasRestantes} días
                                                     </div>
                                                 </div>
@@ -718,7 +730,7 @@ export default function RankingSF6() {
                             <motion.button
                                 whileHover={HOVER}
                                 whileTap={TAP}
-                                className="w-full rounded-md bg-[#c0392b] py-2.5 text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#C3073F]"
+                                className="w-full rounded-md bg-danger-muted py-2.5 text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-danger"
                                 onClick={reiniciarRanking}
                             >
                                 ⚠️ Reiniciar Todos Los Datos
@@ -738,7 +750,7 @@ export default function RankingSF6() {
                         {...FADE}
                     >
                         <motion.div
-                            className="w-full max-w-[420px] rounded-xl border border-[#4E4E50] border-t-4 border-t-[#F0C808] bg-[#141416] p-6 shadow-2xl"
+                            className="w-full max-w-[420px] rounded-xl border border-line border-t-4 border-t-brand bg-panel p-6 shadow-2xl"
                             onClick={(e) => e.stopPropagation()}
                             initial={{opacity: 0, y: -8, scale: 0.97}}
                             animate={{opacity: 1, y: 0, scale: 1}}
@@ -751,7 +763,7 @@ export default function RankingSF6() {
                                     <motion.button
                                         whileHover={HOVER}
                                         whileTap={TAP}
-                                        className="rounded-md border border-[#4E4E50] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-300 transition-colors hover:border-white hover:text-white"
+                                        className="rounded-md border border-line px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-gray-300 transition-colors hover:border-white hover:text-white"
                                         onClick={closeModal}
                                     >
                                         Cancelar
@@ -760,7 +772,7 @@ export default function RankingSF6() {
                                 <motion.button
                                     whileHover={HOVER}
                                     whileTap={TAP}
-                                    className="rounded-md bg-[#F0C808] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-black transition-colors hover:bg-white"
+                                    className="rounded-md bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-black transition-colors hover:bg-white"
                                     onClick={confirmModal}
                                 >
                                     {modal.type === "confirm" ? "Confirmar" : "Aceptar"}

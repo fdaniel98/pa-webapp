@@ -29,7 +29,7 @@ export function AuthShell({
         <div
             className={`flex min-h-screen w-full flex-col items-center justify-center ${PAGE_BG} p-4 font-sans text-white`}
         >
-            <h1 className="pb-6 text-center text-2xl font-bold italic uppercase tracking-wide text-[#F0C808] md:text-3xl">
+            <h1 className="pb-6 text-center text-2xl font-bold italic uppercase tracking-wide text-brand md:text-3xl">
                 修 Puello Academy
             </h1>
 
@@ -37,7 +37,7 @@ export function AuthShell({
                 initial={{opacity: 0, y: 12}}
                 animate={{opacity: 1, y: 0}}
                 transition={{duration: DUR.slow, ease: EASE}}
-                className={`${PANEL} w-full max-w-[420px] border-t-4 border-t-[#F0C808]`}
+                className={`${PANEL} w-full max-w-[420px] border-t-4 border-t-brand`}
             >
                 <h2 className="text-lg font-bold uppercase italic tracking-wide text-white">{title}</h2>
                 {subtitle && <p className="mt-1 text-sm text-gray-400">{subtitle}</p>}
@@ -53,8 +53,8 @@ export function AuthShell({
 export function FormMessage({tone, children}: { tone: "error" | "success"; children: React.ReactNode }) {
     const styles =
         tone === "error"
-            ? "border-[#C3073F] bg-[#C3073F]/10 text-[#ff8095]"
-            : "border-[#2ecc71] bg-[#2ecc71]/10 text-[#7ee2a8]";
+            ? "border-danger bg-danger/10 text-danger-soft"
+            : "border-success bg-success/10 text-success-soft";
 
     return (
         <motion.p

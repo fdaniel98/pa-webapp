@@ -28,7 +28,7 @@ export function SettingsAdmin({ajustes, onToggle}: SettingsAdminProps) {
                     {ajustes.map((ajuste) => (
                         <li
                             key={ajuste.key}
-                            className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-[#4E4E50]/60 bg-black/20 px-4 py-3"
+                            className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-line/60 bg-black/20 px-4 py-3"
                         >
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-semibold text-white">
@@ -54,8 +54,8 @@ export function SettingsAdmin({ajustes, onToggle}: SettingsAdminProps) {
                 <div
                     className={`rounded-r-md border-l-4 px-3 py-2 text-xs ${
                         notificaciones.enabled
-                            ? "border-[#2ecc71] bg-[#2ecc71]/10 text-[#7ee2a8]"
-                            : "border-[#F0C808] bg-[#F0C808]/10 text-[#F0C808]"
+                            ? "border-success bg-success/10 text-success-soft"
+                            : "border-brand bg-brand/10 text-brand"
                     }`}
                 >
                     {notificaciones.enabled ? (
@@ -128,9 +128,9 @@ function Outbox() {
     const conError = entradas.filter((e) => e.estado === "error").length;
 
     return (
-        <div className="border-t border-[#4E4E50] pt-4">
+        <div className="border-t border-line pt-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-bold uppercase italic tracking-wide text-[#F0C808]">
+                <h3 className="text-sm font-bold uppercase italic tracking-wide text-brand">
                     Bandeja de correos
                 </h3>
                 <div className="flex flex-wrap gap-2">
@@ -155,12 +155,12 @@ function Outbox() {
             </p>
 
             {error && (
-                <p className="mb-3 rounded-r-md border-l-4 border-[#C3073F] bg-[#C3073F]/10 px-3 py-2 text-xs text-[#ff8095]">
+                <p className="mb-3 rounded-r-md border-l-4 border-danger bg-danger/10 px-3 py-2 text-xs text-danger-soft">
                     {error}
                 </p>
             )}
             {aviso && (
-                <p className="mb-3 rounded-r-md border-l-4 border-[#2ecc71] bg-[#2ecc71]/10 px-3 py-2 text-xs text-[#7ee2a8]">
+                <p className="mb-3 rounded-r-md border-l-4 border-success bg-success/10 px-3 py-2 text-xs text-success-soft">
                     {aviso}
                 </p>
             )}
@@ -174,7 +174,7 @@ function Outbox() {
                     {entradas.map((e) => (
                         <li
                             key={e.id}
-                            className="flex flex-wrap items-center gap-2 rounded-md border border-[#4E4E50]/60 bg-black/20 px-3 py-2 text-xs"
+                            className="flex flex-wrap items-center gap-2 rounded-md border border-line/60 bg-black/20 px-3 py-2 text-xs"
                         >
                             <EstadoBadge estado={e.estado}/>
                             <span className="min-w-0 flex-1 truncate text-gray-300">{e.asunto}</span>
@@ -183,7 +183,7 @@ function Outbox() {
                                 {new Date(e.sentAt ?? e.createdAt).toLocaleDateString()}
                             </span>
                             {e.error && (
-                                <span className="w-full truncate text-[#ff8095]" title={e.error}>
+                                <span className="w-full truncate text-danger-soft" title={e.error}>
                                     {e.intentos} intento{e.intentos === 1 ? "" : "s"}: {e.error}
                                 </span>
                             )}
@@ -197,9 +197,9 @@ function Outbox() {
 
 function EstadoBadge({estado}: { estado: NotificationEntry["estado"] }) {
     const estilos = {
-        enviada: "bg-[#2ecc71]/15 text-[#7ee2a8]",
-        pendiente: "bg-[#3498db]/15 text-[#3498db]",
-        error: "bg-[#C3073F]/15 text-[#ff8095]",
+        enviada: "bg-success/15 text-success-soft",
+        pendiente: "bg-info/15 text-info",
+        error: "bg-danger/15 text-danger-soft",
     }[estado];
 
     return (
@@ -220,7 +220,7 @@ function Toggle({
 }) {
     return (
         <div className="flex shrink-0 items-center gap-3">
-            <span className={`text-xs font-bold uppercase tracking-wide ${enabled ? "text-[#2ecc71]" : "text-gray-500"}`}>
+            <span className={`text-xs font-bold uppercase tracking-wide ${enabled ? "text-success" : "text-gray-500"}`}>
                 {enabled ? "Activado" : "Apagado"}
             </span>
             <motion.button
@@ -231,8 +231,8 @@ function Toggle({
                 whileHover={HOVER}
                 whileTap={TAP}
                 onClick={() => onChange(!enabled)}
-                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F0C808]/50 ${
-                    enabled ? "bg-[#2ecc71]" : "bg-[#4E4E50]"
+                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 ${
+                    enabled ? "bg-success" : "bg-line"
                 }`}
             >
                 {/* Se anima con x (transform) en vez de alternar left/right, que

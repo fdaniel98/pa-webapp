@@ -98,7 +98,7 @@ export default function Login() {
                 </motion.button>
             </form>
 
-            <div className="mt-5 flex flex-col gap-2 border-t border-[#4E4E50] pt-4 text-sm text-gray-400">
+            <div className="mt-5 flex flex-col gap-2 border-t border-line pt-4 text-sm text-gray-400">
                 <Link to="/forgot-password" className={LINK}>
                     ¿Olvidaste tu contraseña?
                 </Link>

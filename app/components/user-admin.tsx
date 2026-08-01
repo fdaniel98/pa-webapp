@@ -218,9 +218,9 @@ export function UserAdmin({onConfirm}: UserAdminProps) {
                 </motion.button>
             </form>
 
-            <div className="border-t border-[#4E4E50] pt-4">
+            <div className="border-t border-line pt-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-bold uppercase italic tracking-wide text-[#F0C808]">
+                    <h3 className="text-sm font-bold uppercase italic tracking-wide text-brand">
                         Cuentas registradas ({profiles.length})
                     </h3>
                     <motion.button
@@ -241,23 +241,23 @@ export function UserAdmin({onConfirm}: UserAdminProps) {
                 ) : profiles.length === 0 ? (
                     <p className="text-sm text-gray-500">Aún no hay cuentas registradas.</p>
                 ) : (
-                    <div className="overflow-x-auto rounded-md border border-[#4E4E50]/60">
+                    <div className="overflow-x-auto rounded-md border border-line/60">
                         <table className="w-full border-separate border-spacing-0 text-sm">
                             <thead>
                             <tr>
-                                <th className="bg-[#F0C808] px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-black">
+                                <th className="bg-brand px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-black">
                                     Jugador
                                 </th>
-                                <th className="bg-[#F0C808] px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-black">
+                                <th className="bg-brand px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-black">
                                     Correo
                                 </th>
-                                <th className="bg-[#F0C808] px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-black">
+                                <th className="bg-brand px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-black">
                                     Rol
                                 </th>
-                                <th className="bg-[#F0C808] px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-black">
+                                <th className="bg-brand px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-black">
                                     Alta
                                 </th>
-                                <th className="bg-[#F0C808] px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-black">
+                                <th className="bg-brand px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-black">
                                     Acción
                                 </th>
                             </tr>
@@ -280,7 +280,7 @@ export function UserAdmin({onConfirm}: UserAdminProps) {
                                             {/* Nadie puede cambiar su propio rol: evita quedarse sin admins. */}
                                             {esMiCuenta ? (
                                                 <span
-                                                    className="inline-flex rounded-full bg-[#F0C808]/15 px-2.5 py-1 text-xs font-semibold text-[#F0C808]">
+                                                    className="inline-flex rounded-full bg-brand/15 px-2.5 py-1 text-xs font-semibold text-brand">
                                                     {p.role === "admin" ? "Admin" : "Miembro"}
                                                 </span>
                                             ) : (

@@ -19,7 +19,7 @@ export const DUR = {
 /** Para elementos que el usuario mueve o alterna. */
 export const SPRING = {type: "spring", stiffness: 420, damping: 34, mass: 0.7} as const;
 /** Más blando, para reacomodos de layout grandes (filas del ranking). */
-export const SPRING_SOFT = {type: "spring", stiffness: 300, damping: 32, mass: 0.9} as const;
+const SPRING_SOFT = {type: "spring", stiffness: 300, damping: 32, mass: 0.9} as const;
 
 /** Botones compactos: un empujón sutil. */
 export const HOVER = {scale: 1.02};
@@ -29,14 +29,6 @@ export const HOVER = {scale: 1.02};
  */
 export const HOVER_WIDE = {y: -1};
 export const TAP = {scale: 0.97};
-
-/** Entrada/salida de paneles y tarjetas. */
-export const RISE = {
-    initial: {opacity: 0, y: 8},
-    animate: {opacity: 1, y: 0},
-    exit: {opacity: 0, y: -6},
-    transition: {duration: DUR.base, ease: EASE},
-} as const;
 
 /** Aparición simple, sin desplazamiento. */
 export const FADE = {

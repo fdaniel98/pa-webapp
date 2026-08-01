@@ -65,8 +65,8 @@ export function PlayerAdmin({jugadores, onAdd, onSetEmail}: PlayerAdminProps) {
                 Agregar al Ranking
             </motion.button>
 
-            <div className="border-t border-[#4E4E50] pt-4">
-                <h3 className="mb-1 text-sm font-bold uppercase italic tracking-wide text-[#F0C808]">
+            <div className="border-t border-line pt-4">
+                <h3 className="mb-1 text-sm font-bold uppercase italic tracking-wide text-brand">
                     Correos para notificaciones
                 </h3>
                 <p className="mb-3 text-xs text-gray-500">
@@ -97,9 +97,9 @@ function EmailRow({jugador, onSave}: { jugador: Player; onSave: (id: string, ema
     const cambiado = valor.trim() !== (jugador.email ?? "");
 
     return (
-        <li className="flex flex-wrap items-center gap-2 rounded-md border border-[#4E4E50]/60 bg-black/20 px-3 py-2">
+        <li className="flex flex-wrap items-center gap-2 rounded-md border border-line/60 bg-black/20 px-3 py-2">
             <span className="w-8 shrink-0 font-mono text-xs text-gray-500">#{jugador.rangoActual}</span>
-            <span className="w-32 shrink-0 truncate text-sm font-semibold text-white">{jugador.nombre}</span>
+            <span className="w-24 shrink-0 truncate text-sm font-semibold text-white sm:w-32">{jugador.nombre}</span>
             <input
                 type="email"
                 value={valor}

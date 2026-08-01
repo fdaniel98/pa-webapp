@@ -148,10 +148,6 @@ export function createChallenge(retadorId: string, retadoId: string) {
     return callRpc("create_challenge", {p_retador_id: retadorId, p_retado_id: retadoId});
 }
 
-export function resolveChallenge(challengeId: string, ganadorId: string) {
-    return callRpc("resolve_challenge", {p_challenge_id: challengeId, p_ganador_id: ganadorId});
-}
-
 export function cancelChallenge(challengeId: string) {
     return callRpc("cancel_challenge", {p_challenge_id: challengeId});
 }

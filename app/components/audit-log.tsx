@@ -10,12 +10,12 @@ const PAGE_SIZE = 50;
 
 /** Colores por familia de acción, para escanear la lista de un vistazo. */
 function accionColor(accion: string) {
-    if (accion.startsWith("reto_")) return "bg-[#3498db]/15 text-[#3498db]";
+    if (accion.startsWith("reto_")) return "bg-info/15 text-info";
     if (accion.startsWith("sesion_")) return "bg-white/10 text-gray-300";
     if (accion.includes("eliminado") || accion === "ranking_reiniciado" || accion === "bitacora_purgada") {
-        return "bg-[#C3073F]/15 text-[#ff8095]";
+        return "bg-danger/15 text-danger-soft";
     }
-    return "bg-[#F0C808]/15 text-[#F0C808]";
+    return "bg-brand/15 text-brand";
 }
 
 type AuditLogProps = {
@@ -82,7 +82,7 @@ export function AuditLog({onConfirm}: AuditLogProps) {
                         id="filtro-accion"
                         value={accion}
                         onChange={(e) => setAccion(e.target.value)}
-                        className={`${INPUT} w-64`}
+                        className={`${INPUT} w-full sm:w-64`}
                     >
                         <option value="">Todas las acciones</option>
                         {ACCIONES.map((key) => (
@@ -106,12 +106,12 @@ export function AuditLog({onConfirm}: AuditLogProps) {
             </div>
 
             {error && (
-                <p className="rounded-r-md border-l-4 border-[#C3073F] bg-[#C3073F]/10 px-3 py-2 text-xs text-[#ff8095]">
+                <p className="rounded-r-md border-l-4 border-danger bg-danger/10 px-3 py-2 text-xs text-danger-soft">
                     {error}
                 </p>
             )}
             {aviso && (
-                <p className="rounded-r-md border-l-4 border-[#2ecc71] bg-[#2ecc71]/10 px-3 py-2 text-xs text-[#7ee2a8]">
+                <p className="rounded-r-md border-l-4 border-success bg-success/10 px-3 py-2 text-xs text-success-soft">
                     {aviso}
                 </p>
             )}
@@ -128,7 +128,7 @@ export function AuditLog({onConfirm}: AuditLogProps) {
                                 key={e.id}
                                 layout
                                 {...LIST_ITEM_MOTION}
-                                className="rounded-md border border-[#4E4E50]/60 bg-black/20 px-3 py-2"
+                                className="rounded-md border border-line/60 bg-black/20 px-3 py-2"
                             >
                                 <div className="flex flex-wrap items-center gap-2 text-xs">
                                     <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${accionColor(e.accion)}`}>

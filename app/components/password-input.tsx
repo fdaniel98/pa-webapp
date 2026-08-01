@@ -46,7 +46,7 @@ export function PasswordInput({
                 aria-pressed={visible}
                 aria-controls={inputId}
                 title={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-gray-500 transition-colors hover:text-[#F0C808] focus:outline-none focus-visible:text-[#F0C808] focus-visible:ring-2 focus-visible:ring-[#F0C808]/50"
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-gray-500 transition-colors hover:text-brand focus:outline-none focus-visible:text-brand focus-visible:ring-2 focus-visible:ring-brand/50"
             >
                 {visible ? <EyeOffIcon/> : <EyeIcon/>}
             </button>
