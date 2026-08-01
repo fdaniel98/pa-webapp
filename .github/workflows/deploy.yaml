@@ -35,6 +35,11 @@ jobs:
 
       - name: Build Application
         run: npm run build
+        env:
+          # Definir en Settings > Secrets and variables > Actions.
+          # Ambas terminan en el bundle público: usa la publishable/anon key, nunca la secret key.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
       - name: Prepare Pages Output
         run: |

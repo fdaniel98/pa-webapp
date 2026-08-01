@@ -7,7 +7,10 @@ import {
   ScrollRestoration,
 } from "react-router";
 
+import { MotionConfig } from "motion/react";
+
 import type { Route } from "./+types/root";
+import { AuthProvider } from "~/lib/auth";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
@@ -32,7 +35,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return (
+    // reducedMotion="user" respeta la preferencia del sistema: Motion conserva
+    // los cambios de opacidad y omite desplazamientos, escalas y layout.
+    <MotionConfig reducedMotion="user">
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
+    </MotionConfig>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
