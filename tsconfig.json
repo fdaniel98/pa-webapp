@@ -5,6 +5,8 @@
     "**/.client/**/*",
     ".react-router/types/**/*"
   ],
+  "//": "Las Edge Functions corren en Deno, con su propio runtime y tipos.",
+  "exclude": ["supabase/functions/**/*"],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "types": ["node", "vite/client"],

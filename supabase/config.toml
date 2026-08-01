@@ -1,0 +1,13 @@
+# Configuración del CLI de Supabase para este proyecto.
+project_id = "tlcpgdxjvmcsuzvxllga"
+
+[functions.create-user]
+# Supabase valida el JWT antes de ejecutar la función; dentro, la función además
+# comprueba que el perfil de quien llama tenga role = 'admin'.
+verify_jwt = true
+
+[functions.send-notifications]
+verify_jwt = true
+
+[functions.delete-user]
+verify_jwt = true
