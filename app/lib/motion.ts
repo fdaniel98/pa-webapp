@@ -30,6 +30,18 @@ export const HOVER = {scale: 1.02};
 export const HOVER_WIDE = {y: -1};
 export const TAP = {scale: 0.97};
 
+/**
+ * El scroll programático no pasa por <MotionConfig> ni por el CSS, así que aquí se
+ * consulta la preferencia a mano para no arrastrar la pantalla a quien pidió menos
+ * movimiento.
+ */
+export function scrollBehavior(): ScrollBehavior {
+    const reducido =
+        typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    return reducido ? "auto" : "smooth";
+}
+
 /** Aparición simple, sin desplazamiento. */
 export const FADE = {
     initial: {opacity: 0},

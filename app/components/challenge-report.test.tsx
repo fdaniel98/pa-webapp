@@ -15,18 +15,25 @@ const retado: Player = {
 };
 const reto: Challenge = {
     id: "c1", retadorId: "p2", retadoId: "p1",
+    creadoEn: Date.now() - 2 * 24 * 60 * 60 * 1000,
     expiraEn: Date.now() + 5 * 24 * 60 * 60 * 1000,
 };
 
-function montar() {
+function montar(destacado = false) {
     const onReport = jest.fn();
     const onCancel = jest.fn();
     render(
-        <ChallengeReport reto={reto} retador={retador} retado={retado}
+        <ChallengeReport reto={reto} retador={retador} retado={retado} destacado={destacado}
                          onReport={onReport} onCancel={onCancel}/>
     );
     return {onReport, onCancel, user: userEvent.setup()};
 }
+
+// jsdom no implementa scrollIntoView.
+const scrollIntoView = jest.fn();
+beforeAll(() => {
+    Element.prototype.scrollIntoView = scrollIntoView;
+});
 
 describe("ChallengeReport", () => {
     it("muestra a los dos jugadores y los días que faltan", () => {
@@ -89,6 +96,18 @@ describe("ChallengeReport", () => {
             await screen.findByText("El ganador debe tener más games que el perdedor.")
         ).toBeInTheDocument();
         expect(onReport).not.toHaveBeenCalled();
+    });
+
+    it("no se mueve solo cuando no es el reto elegido", () => {
+        montar();
+        expect(scrollIntoView).not.toHaveBeenCalled();
+        expect(screen.getByLabelText(/quién ganó/i)).not.toHaveFocus();
+    });
+
+    it("se busca solo y toma el foco cuando llega desde Retos Vigentes", () => {
+        montar(true);
+        expect(scrollIntoView).toHaveBeenCalled();
+        expect(screen.getByLabelText(/quién ganó/i)).toHaveFocus();
     });
 
     it("cancela el reto sin reportar", async () => {

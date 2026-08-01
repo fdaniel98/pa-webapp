@@ -1,5 +1,5 @@
-import {toChallenge, toMatch, toPlayer} from "./transforms";
-import type {ChallengeRow, MatchRow, PlayerRow} from "./transforms";
+import {toChallenge, toExpiredChallenge, toMatch, toPlayer} from "./transforms";
+import type {ChallengeRow, ExpiredChallengeRow, MatchRow, PlayerRow} from "./transforms";
 
 const jugadorBase: PlayerRow = {
     id: "p1",
@@ -38,15 +38,58 @@ describe("toChallenge", () => {
         retador_id: "p2",
         retado_id: "p1",
         expira_en: "2026-08-08T12:00:00.000Z",
+        created_at: "2026-08-01T12:00:00.000Z",
     };
 
-    it("mapea los identificadores y la caducidad", () => {
+    it("mapea los identificadores, el lanzamiento y la caducidad", () => {
         expect(toChallenge(reto)).toEqual({
             id: "c1",
             retadorId: "p2",
             retadoId: "p1",
             expiraEn: Date.parse("2026-08-08T12:00:00.000Z"),
+            creadoEn: Date.parse("2026-08-01T12:00:00.000Z"),
         });
+    });
+});
+
+describe("toExpiredChallenge", () => {
+    const expirado: ExpiredChallengeRow = {
+        id: "e1",
+        retador_nombre: "EDGON",
+        retado_nombre: "VALAK",
+        causa: "vencido",
+        expira_en: "2026-08-08T12:00:00.000Z",
+        cerrado_en: "2026-08-08T12:05:00.000Z",
+        motivo: null,
+        motivo_por_nombre: null,
+        motivo_en: null,
+    };
+
+    it("convierte las fechas a epoch en ms", () => {
+        const e = toExpiredChallenge(expirado);
+        expect(e.expiraEn).toBe(Date.parse("2026-08-08T12:00:00.000Z"));
+        expect(e.cerradoEn).toBe(Date.parse("2026-08-08T12:05:00.000Z"));
+    });
+
+    it("deja el motivo en null mientras nadie lo haya escrito", () => {
+        const e = toExpiredChallenge(expirado);
+        expect(e.motivo).toBeNull();
+        expect(e.motivoPor).toBeNull();
+        expect(e.motivoEn).toBeNull();
+    });
+
+    it("mapea el motivo y quién lo escribió", () => {
+        const e = toExpiredChallenge({
+            ...expirado,
+            causa: "cancelado",
+            motivo: "Se lesionó la mano",
+            motivo_por_nombre: "DANIEL",
+            motivo_en: "2026-08-09T09:00:00.000Z",
+        });
+        expect(e.causa).toBe("cancelado");
+        expect(e.motivo).toBe("Se lesionó la mano");
+        expect(e.motivoPor).toBe("DANIEL");
+        expect(e.motivoEn).toBe(Date.parse("2026-08-09T09:00:00.000Z"));
     });
 });
 

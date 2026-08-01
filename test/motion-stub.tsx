@@ -32,9 +32,23 @@ function componentePara(tag: string) {
     });
 }
 
+// El componente de cada etiqueta se guarda: si el proxy creara uno nuevo en cada
+// acceso, React vería un tipo distinto en cada render y desmontaría el subárbol,
+// perdiendo el foco y el texto de los inputs que haya dentro.
+const cache = new Map<string, ReturnType<typeof componentePara>>();
+
 export const motion: Record<string, ReturnType<typeof componentePara>> = new Proxy(
     {},
-    {get: (_objetivo, tag: string) => componentePara(tag)}
+    {
+        get: (_objetivo, tag: string) => {
+            let componente = cache.get(tag);
+            if (!componente) {
+                componente = componentePara(tag);
+                cache.set(tag, componente);
+            }
+            return componente;
+        },
+    }
 ) as never;
 
 export const AnimatePresence = ({children}: { children?: ReactNode }) => children ?? null;

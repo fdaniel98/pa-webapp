@@ -20,6 +20,8 @@ export type Challenge = {
     retadoId: string;
     /** Epoch en ms. */
     expiraEn: number;
+    /** Epoch en ms del momento en que se lanzó. */
+    creadoEn: number;
 };
 
 export type HistoryEntry = {
@@ -41,7 +43,7 @@ export async function fetchRankingState(): Promise<RankingState> {
             .from("players")
             .select("id, nombre, rango_actual, rango_anterior, cooldown_hasta, email")
             .order("rango_actual", {ascending: true}),
-        supabase.from("challenges").select("id, retador_id, retado_id, expira_en"),
+        supabase.from("challenges").select("id, retador_id, retado_id, expira_en, created_at"),
         supabase
             .from("ranking_history")
             .select("id, texto, created_at")

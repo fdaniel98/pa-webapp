@@ -22,6 +22,9 @@ const AuditLog = lazy(() =>
 const SettingsAdmin = lazy(() =>
     import("~/components/settings-admin").then((m) => ({default: m.SettingsAdmin}))
 );
+const ExpiredChallenges = lazy(() =>
+    import("~/components/expired-challenges").then((m) => ({default: m.ExpiredChallenges}))
+);
 import type {AppSetting} from "~/lib/settings";
 import {fetchSettings, NOTIFICACIONES_RETOS, setSetting} from "~/lib/settings";
 import type {MatchReport} from "~/lib/matches";
@@ -41,6 +44,8 @@ import {
     subscribeToRanking,
     type RankingState,
 } from "~/lib/ranking";
+import {cambioDePuesto, exportarRankingComoImagen} from "~/lib/ranking-image";
+import {exportarRetosComoImagen} from "~/lib/challenges-image";
 import {DUR, EASE, FADE, HOVER, LIST_ITEM_MOTION, ROW_MOTION, SPRING, TAP} from "~/lib/motion";
 import {
     BTN_DANGER_SM,
@@ -97,6 +102,10 @@ export default function RankingSF6() {
     const [ajustes, setAjustes] = useState<AppSetting[]>([]);
     const [modal, setModal] = useState<ModalState | null>(null);
     const [activeTab, setActiveTab] = useState<TabKey>("ranking");
+    const [retosExpiradosSenal, setRetosExpiradosSenal] = useState(0);
+    const [retoDestacadoId, setRetoDestacadoId] = useState<string | null>(null);
+    const [exportando, setExportando] = useState(false);
+    const [exportandoRetos, setExportandoRetos] = useState(false);
     const [dragPreview, setDragPreview] = useState<Player[] | null>(null);
     const dragPreviewRef = useRef<Player[] | null>(null);
 
@@ -130,6 +139,12 @@ export default function RankingSF6() {
         const actual = TABS.find((t) => t.key === activeTab);
         if (actual?.adminOnly && !isAdmin) setActiveTab("ranking");
     }, [activeTab, isAdmin]);
+
+    // Al salir de Retos se olvida el reto resaltado, para que volver a pulsar
+    // "Reportar resultado" sobre el mismo vuelva a llevar hasta su formulario.
+    useEffect(() => {
+        if (activeTab !== "retos") setRetoDestacadoId(null);
+    }, [activeTab]);
 
     useEffect(() => {
         if (!modal) return;
@@ -226,15 +241,42 @@ export default function RankingSF6() {
     function reportarResultado(report: MatchReport) {
         void run(async () => {
             await reportMatch(report);
+            setRetoDestacadoId(null);
             dispararNotificaciones();
         });
     }
 
+    /** Desde la barra lateral: abre la pestaña Retos en el formulario de ese reto. */
+    function irAReportar(retoId: string) {
+        setRetoDestacadoId(retoId);
+        setActiveTab("retos");
+    }
+
     function cancelarReto(retoId: string) {
         showConfirm(
-            "¿Estás seguro de cancelar/expirar este reto? Ninguno sufrirá cambios de ranking ni cooldown.",
-            () => void run(() => cancelChallenge(retoId))
+            "¿Estás seguro de cancelar/expirar este reto? Ninguno sufrirá cambios de ranking ni cooldown. Podrás anotar el motivo después, en Retos expirados.",
+            () =>
+                void run(async () => {
+                    await cancelChallenge(retoId);
+                    setRetosExpiradosSenal((n) => n + 1);
+                })
         );
+    }
+
+    /** Descarga el ranking como PNG: sólo puesto, jugador y cambio. */
+    function exportarImagen() {
+        setExportando(true);
+        exportarRankingComoImagen(jugadores)
+            .catch((err) => showAlert(err instanceof Error ? err.message : String(err)))
+            .finally(() => setExportando(false));
+    }
+
+    /** Descarga los retos vigentes como PNG, con el mismo aspecto que el ranking. */
+    function exportarImagenRetos() {
+        setExportandoRetos(true);
+        exportarRetosComoImagen(retosVigentes, jugadores)
+            .catch((err) => showAlert(err instanceof Error ? err.message : String(err)))
+            .finally(() => setExportandoRetos(false));
     }
 
     function agregarJugador(nombre: string, email: string) {
@@ -320,16 +362,15 @@ export default function RankingSF6() {
     }
 
     function filaContenido(j: Player) {
-        const dif = j.rangoAnterior - j.rangoActual;
-        let cambioTexto = "-";
-        let cambioClase = "text-gray-500";
-        if (dif > 0) {
-            cambioTexto = `▲ +${dif}`;
-            cambioClase = "font-bold text-success";
-        } else if (dif < 0) {
-            cambioTexto = `▼ ${dif}`;
-            cambioClase = "font-bold text-danger";
-        }
+        // El mismo cálculo que se exporta a la imagen, para que tabla e imagen no
+        // puedan discrepar.
+        const {texto: cambioTexto, tendencia} = cambioDePuesto(j);
+        const cambioClase =
+            tendencia === "sube"
+                ? "font-bold text-success"
+                : tendencia === "baja"
+                    ? "font-bold text-danger"
+                    : "text-gray-500";
 
         let estadoNodo: React.ReactNode = <span className="text-xs text-gray-400">Disponible</span>;
         if (j.cooldownHasta && j.cooldownHasta > ahora) {
@@ -491,6 +532,19 @@ export default function RankingSF6() {
                             fallback={<p className="p-4 text-sm text-gray-500">Cargando panel...</p>}
                         >
                         {activeTab === "ranking" && (
+                            <div className="flex min-h-0 flex-1 flex-col gap-3">
+                            <div className="flex justify-end">
+                                <motion.button
+                                    type="button"
+                                    whileHover={HOVER}
+                                    whileTap={TAP}
+                                    className={BTN_GHOST_SM}
+                                    disabled={exportando || jugadores.length === 0}
+                                    onClick={exportarImagen}
+                                >
+                                    {exportando ? "Generando imagen..." : "Exportar imagen"}
+                                </motion.button>
+                            </div>
                             <div
                                 className="sf6-scroll max-h-[60vh] min-h-0 flex-1 overflow-auto rounded-md border border-line/60 lg:max-h-none">
                                 <table className="w-full border-separate border-spacing-0 text-sm">
@@ -529,6 +583,7 @@ export default function RankingSF6() {
                                         </tbody>
                                     )}
                                 </table>
+                            </div>
                             </div>
                         )}
 
@@ -578,6 +633,7 @@ export default function RankingSF6() {
                                                             reto={r}
                                                             retador={retador}
                                                             retado={retado}
+                                                            destacado={retoDestacadoId === r.id}
                                                             onReport={reportarResultado}
                                                             onCancel={cancelarReto}
                                                         />
@@ -586,6 +642,11 @@ export default function RankingSF6() {
                                             })}
                                         </ul>
                                     )}
+                                </div>
+
+                                <div className="mt-2 w-full border-t border-line pt-4">
+                                    <h3 className={SECTION_TITLE}>Retos expirados</h3>
+                                    <ExpiredChallenges recargar={retosExpiradosSenal}/>
                                 </div>
                             </div>
                         )}
@@ -614,7 +675,19 @@ export default function RankingSF6() {
 
                 <div className="sf6-scroll flex min-h-0 flex-col gap-5 lg:overflow-y-auto">
                     <div className={PANEL}>
-                        <h2 className={SECTION_TITLE}>Retos Vigentes</h2>
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <h2 className={`${SECTION_TITLE} mb-0`}>Retos Vigentes</h2>
+                            <motion.button
+                                type="button"
+                                whileHover={HOVER}
+                                whileTap={TAP}
+                                className={BTN_GHOST_SM}
+                                disabled={exportandoRetos || retosVigentes.length === 0}
+                                onClick={exportarImagenRetos}
+                            >
+                                {exportandoRetos ? "Generando imagen..." : "Exportar imagen"}
+                            </motion.button>
+                        </div>
                         <ul className="space-y-2">
                             <AnimatePresence mode="popLayout">
                                 {retosVigentes.length === 0 ? (
@@ -653,7 +726,7 @@ export default function RankingSF6() {
                                                             también el marcador SF6. */}
                                                         <motion.button whileHover={HOVER} whileTap={TAP}
                                                                        className={BTN_WIN_SM}
-                                                                       onClick={() => setActiveTab("retos")}>
+                                                                       onClick={() => irAReportar(r.id)}>
                                                             Reportar resultado
                                                         </motion.button>
                                                         <motion.button whileHover={HOVER} whileTap={TAP}

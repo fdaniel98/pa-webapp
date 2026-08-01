@@ -5,6 +5,7 @@
 
 import type {Challenge, HistoryEntry, Player} from "./ranking";
 import type {Match} from "./matches";
+import type {ExpiredChallenge} from "./expired-challenges";
 
 export type PlayerRow = {
     id: string;
@@ -20,6 +21,19 @@ export type ChallengeRow = {
     retador_id: string;
     retado_id: string;
     expira_en: string;
+    created_at: string;
+};
+
+export type ExpiredChallengeRow = {
+    id: string;
+    retador_nombre: string;
+    retado_nombre: string;
+    causa: "vencido" | "cancelado";
+    expira_en: string;
+    cerrado_en: string;
+    motivo: string | null;
+    motivo_por_nombre: string | null;
+    motivo_en: string | null;
 };
 
 export type HistoryRow = {
@@ -62,6 +76,21 @@ export function toChallenge(row: ChallengeRow): Challenge {
         retadorId: row.retador_id,
         retadoId: row.retado_id,
         expiraEn: new Date(row.expira_en).getTime(),
+        creadoEn: new Date(row.created_at).getTime(),
+    };
+}
+
+export function toExpiredChallenge(row: ExpiredChallengeRow): ExpiredChallenge {
+    return {
+        id: row.id,
+        retadorNombre: row.retador_nombre,
+        retadoNombre: row.retado_nombre,
+        causa: row.causa,
+        expiraEn: new Date(row.expira_en).getTime(),
+        cerradoEn: new Date(row.cerrado_en).getTime(),
+        motivo: row.motivo,
+        motivoPor: row.motivo_por_nombre,
+        motivoEn: row.motivo_en ? new Date(row.motivo_en).getTime() : null,
     };
 }
 

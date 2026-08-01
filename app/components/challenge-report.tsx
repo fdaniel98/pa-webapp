@@ -1,9 +1,9 @@
-import {useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {motion} from "motion/react";
 
 import type {MatchReport} from "~/lib/matches";
 import {parseScore} from "~/lib/score";
-import {HOVER, TAP} from "~/lib/motion";
+import {HOVER, scrollBehavior, TAP} from "~/lib/motion";
 import type {Challenge, Player} from "~/lib/ranking";
 import {BTN_DANGER_SM, BTN_PRIMARY, INPUT, LABEL} from "~/lib/theme";
 
@@ -13,15 +13,36 @@ type ChallengeReportProps = {
     retado: Player;
     onReport: (report: MatchReport) => void;
     onCancel: (challengeId: string) => void;
+    /** Reto elegido desde "Retos Vigentes": se busca solo en la lista y se resalta. */
+    destacado?: boolean;
 };
 
 /** Formulario para introducir el resultado SF6 de un reto vigente. */
-export function ChallengeReport({reto, retador, retado, onReport, onCancel}: ChallengeReportProps) {
+export function ChallengeReport({
+                                    reto,
+                                    retador,
+                                    retado,
+                                    onReport,
+                                    onCancel,
+                                    destacado = false,
+                                }: ChallengeReportProps) {
     const [ganadorId, setGanadorId] = useState("");
     const [setsGanador, setSetsGanador] = useState("");
     const [setsPerdedor, setSetsPerdedor] = useState("");
     const [notas, setNotas] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const formRef = useRef<HTMLFormElement>(null);
+    const ganadorRef = useRef<HTMLSelectElement>(null);
+
+    // Con varios retos en la lista, cambiar de pestaña dejaba al admin arriba del
+    // todo sin saber cuál de los formularios era el suyo.
+    useEffect(() => {
+        if (!destacado) return;
+
+        formRef.current?.scrollIntoView?.({behavior: scrollBehavior(), block: "center"});
+        // El scroll ya coloca el formulario: enfocar sin volver a desplazar.
+        ganadorRef.current?.focus({preventScroll: true});
+    }, [destacado]);
 
     const perdedor = ganadorId === retador.id ? retado : ganadorId === retado.id ? retador : null;
 
@@ -53,8 +74,11 @@ export function ChallengeReport({reto, retador, retado, onReport, onCancel}: Cha
 
     return (
         <form
+            ref={formRef}
             onSubmit={enviar}
-            className="rounded-r-md border-l-4 border-info bg-info/10 p-3"
+            className={`rounded-r-md border-l-4 border-info bg-info/10 p-3 transition-shadow ${
+                destacado ? "ring-2 ring-brand" : ""
+            }`}
         >
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>
@@ -81,6 +105,7 @@ export function ChallengeReport({reto, retador, retado, onReport, onCancel}: Cha
                     </label>
                     <select
                         id={`ganador-${reto.id}`}
+                        ref={ganadorRef}
                         value={ganadorId}
                         onChange={(e) => setGanadorId(e.target.value)}
                         className={`${INPUT} w-full`}

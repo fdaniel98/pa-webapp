@@ -2,8 +2,9 @@
 -- Puello Academy - Reinicio de datos para pruebas
 -- Ejecutar en Supabase > SQL Editor cuando quieras volver a un estado limpio.
 -- =============================================================================
--- BORRA: enfrentamientos, retos, historial, bandeja de correos, bitácora y el
---        ranking completo (que se vuelve a sembrar con los 36 nombres originales).
+-- BORRA: enfrentamientos, retos (vigentes y expirados), historial, bandeja de
+--        correos, bitácora y el ranking completo (que se vuelve a sembrar con los
+--        36 nombres originales).
 --
 -- NO TOCA: auth.users ni public.profiles. Las cuentas, sus contraseñas y sus
 --          roles quedan intactos, así que no pierdes el acceso ni tu rol de admin.
@@ -16,6 +17,7 @@
 --    borrarlos en orden deja la bitácora coherente).
 delete from public.matches;
 delete from public.notifications;
+delete from public.expired_challenges;
 delete from public.challenges;
 delete from public.ranking_history;
 
@@ -41,13 +43,14 @@ set enabled    = false,
     updated_by = null
 where key = 'notificaciones_retos';
 
--- 4. Comprobación: debe devolver 36 / 0 / 0 / 0 / 0 / 0 y las cuentas intactas.
-select (select count(*) from public.players)         as jugadores,
-       (select count(*) from public.challenges)      as retos,
-       (select count(*) from public.matches)         as enfrentamientos,
-       (select count(*) from public.ranking_history) as historial,
-       (select count(*) from public.notifications)   as correos,
-       (select count(*) from public.audit_log)       as bitacora,
-       (select count(*) from public.profiles)        as cuentas_conservadas,
+-- 4. Comprobación: debe devolver 36 / 0 / 0 / 0 / 0 / 0 / 0 y las cuentas intactas.
+select (select count(*) from public.players)            as jugadores,
+       (select count(*) from public.challenges)         as retos,
+       (select count(*) from public.expired_challenges) as retos_expirados,
+       (select count(*) from public.matches)            as enfrentamientos,
+       (select count(*) from public.ranking_history)    as historial,
+       (select count(*) from public.notifications)      as correos,
+       (select count(*) from public.audit_log)          as bitacora,
+       (select count(*) from public.profiles)           as cuentas_conservadas,
        (select count(*) from public.profiles
-         where role = 'admin')                       as admins_conservados;
+         where role = 'admin')                          as admins_conservados;

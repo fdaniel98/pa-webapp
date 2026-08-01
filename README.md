@@ -72,6 +72,7 @@ usa funciones definidas en los anteriores.
 | 5 | `supabase/fixes.sql` | Caducidad real de retos y cambio de rol |
 | 6 | `supabase/audit.sql` | `audit_log` y registro de todas las acciones |
 | 7 | `supabase/matches.sql` | `matches`: historial de enfrentamientos con marcador SF6 |
+| 8 | `supabase/expired-challenges.sql` | `expired_challenges`: archivo de retos cerrados sin jugarse y su motivo |
 
 Cada uno debe terminar con *Success. No rows returned*.
 
@@ -81,7 +82,7 @@ Comprobación rápida al final:
 select (select count(*) from public.players)         as jugadores,       -- 36
        (select count(*) from public.app_settings)    as ajustes,         -- 1
        (select count(*) from pg_publication_tables
-         where pubname = 'supabase_realtime' and schemaname = 'public') as tablas_en_realtime;  -- 5
+         where pubname = 'supabase_realtime' and schemaname = 'public') as tablas_en_realtime;  -- 6
 ```
 
 ### 4. Configurar Authentication
@@ -244,8 +245,8 @@ dejarla dentro de un componente: así queda cubierta.
 ### Reiniciar los datos para probar
 
 `supabase/reset-test-data.sql` deja el ranking como recién instalado: borra
-enfrentamientos, retos, historial, bandeja de correos y bitácora, resiembra los 36
-nombres originales y apaga las notificaciones.
+enfrentamientos, retos (vigentes y expirados), historial, bandeja de correos y bitácora,
+resiembra los 36 nombres originales y apaga las notificaciones.
 
 **No toca `auth.users` ni `profiles`**, así que las cuentas, sus contraseñas y los roles
 sobreviven: no pierdes el acceso ni tu rol de admin. Termina con un `select` que confirma
@@ -259,7 +260,16 @@ registro de auditoría, comenta la línea `delete from public.audit_log;`.
 
 ## Despliegue a GitHub Pages
 
-El workflow `.github/workflows/deploy.yaml` publica automáticamente en cada push a `main`.
+El workflow `.github/workflows/deploy.yaml` tiene dos trabajos:
+
+| Trabajo | Cuándo | Qué hace |
+|---|---|---|
+| `verify` | Push a `main` **y** pull requests | `npm run typecheck` y `npm test -- --ci` |
+| `deploy` | Sólo push a `main`, y sólo si `verify` pasó | Compila y publica en GitHub Pages |
+
+`deploy` declara `needs: verify`, así que **un test en rojo impide el despliegue**: el sitio
+en producción nunca se actualiza con código que no compila o que rompe pruebas. Los pull
+request se verifican pero no publican nada.
 
 Antes del primer despliegue hay que añadir las variables en
 **GitHub → Settings → Secrets and variables → Actions**:
@@ -301,9 +311,9 @@ si tu perfil tiene `role = 'admin'`, y además cada acción se verifica en el se
 
 | Pestaña | Quién la ve | Para qué |
 |---|---|---|
-| **Ranking** | Todos | Tabla de posiciones. Los admins pueden reordenar arrastrando y eliminar jugadores |
+| **Ranking** | Todos | Tabla de posiciones y descarga del ranking como PNG (puesto, jugador y cambio). Los admins pueden reordenar arrastrando y eliminar jugadores |
 | **Historial** | Todos | Enfrentamientos resueltos. Filtra por jugador y muestra su récord (V-D, games, movimiento de puestos) |
-| **Retos** | Admin | Lanzar retos y reportar resultados con el marcador SF6 |
+| **Retos** | Admin | Lanzar retos, reportar resultados con el marcador SF6 y anotar el motivo de los retos expirados |
 | **Jugadores** | Admin | Alta de jugadores y correos para notificaciones |
 | **Usuarios** | Admin | Crear cuentas, cambiar roles y eliminar cuentas |
 | **Bitácora** | Admin | Registro de todas las acciones, con filtro y purga |
@@ -318,6 +328,7 @@ si tu perfil tiene `role = 'admin'`, y además cada acción se verifica en el se
 | `profiles` | Espejo de `auth.users` con `full_name` y `role` |
 | `players` | Ranking: nombre, puesto actual/anterior, enfriamiento, correo |
 | `challenges` | Retos vigentes con su fecha de caducidad |
+| `expired_challenges` | Retos que vencieron o se cancelaron sin jugarse, con un motivo opcional |
 | `matches` | Enfrentamientos resueltos: marcador SF6 y movimiento de puestos |
 | `ranking_history` | Línea de tiempo legible que se muestra en la barra lateral |
 | `notifications` | Bandeja de salida de correos (`pendiente` / `enviada` / `error`) |
@@ -382,6 +393,10 @@ app/
 │   ├── functions.ts   # Llamadas a Edge Functions
 │   ├── ranking.ts     # players, challenges, ranking_history, realtime
 │   ├── matches.ts     # Enfrentamientos y récord
+│   ├── expired-challenges.ts # Retos cerrados sin jugarse y su motivo
+│   ├── image-export.ts  # Marco común de las imágenes: título, cabecera y pie
+│   ├── ranking-image.ts # Exportación del ranking a PNG (canvas, sin librerías)
+│   ├── challenges-image.ts # Exportación de los retos vigentes a PNG
 │   ├── users.ts       # Cuentas y roles
 │   ├── audit.ts       # Bitácora
 │   ├── notifications.ts, settings.ts
@@ -394,6 +409,10 @@ supabase/
 ├── functions/         # Edge Functions (Deno)
 └── config.toml        # project_id y verify_jwt por función
 ```
+
+La barra lateral (*Retos Vigentes*) exporta los retos a PNG con el mismo marco que el
+ranking: quién reta a quién con su puesto, qué puesto está en juego y las fechas de
+lanzamiento y caducidad.
 
 Los paneles de las pestañas se cargan con `React.lazy`, así que un miembro no descarga la
 interfaz de administración.

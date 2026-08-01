@@ -30,6 +30,7 @@ export const ACCION_LABEL: Record<string, string> = {
     reto_resuelto: "Reto resuelto",
     reto_cancelado: "Reto cancelado",
     reto_expirado: "Reto expirado",
+    motivo_expiracion: "Motivo de expiración",
     ranking_reiniciado: "Ranking reiniciado",
     ajuste_cambiado: "Ajuste cambiado",
     rol_cambiado: "Rol cambiado",
