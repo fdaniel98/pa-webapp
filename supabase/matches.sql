@@ -10,7 +10,6 @@
 -- jugador, su historial sigue siendo legible (las FK quedan en null).
 -- =============================================================================
 
-
 -- 1. TABLA -----------------------------------------------------------------------
 create table if not exists public.matches
 (
