@@ -187,6 +187,7 @@ export function subscribeToRanking(onChange: () => void) {
         .on("postgres_changes", {event: "*", schema: "public", table: "challenges"}, onChange)
         .on("postgres_changes", {event: "*", schema: "public", table: "ranking_history"}, onChange)
         .on("postgres_changes", {event: "*", schema: "public", table: "app_settings"}, onChange)
+        .on("postgres_changes", {event: "*", schema: "public", table: "matches"}, onChange)
         .subscribe();
 
     return () => {

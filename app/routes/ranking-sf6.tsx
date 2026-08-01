@@ -2,13 +2,17 @@ import {useCallback, useEffect, useRef, useState} from "react";
 import {AnimatePresence, motion, Reorder} from "motion/react";
 import type {Route} from "./+types/ranking-sf6";
 import {AuditLog} from "~/components/audit-log";
+import {ChallengeReport} from "~/components/challenge-report";
 import {Footer} from "~/components/footer";
+import {MatchHistory} from "~/components/match-history";
 import {PlayerAdmin} from "~/components/player-admin";
 import {SettingsAdmin} from "~/components/settings-admin";
 import {UserAdmin} from "~/components/user-admin";
 import {useAuth} from "~/lib/auth";
 import type {AppSetting} from "~/lib/settings";
 import {fetchSettings, NOTIFICACIONES_RETOS, setSetting} from "~/lib/settings";
+import type {MatchReport} from "~/lib/matches";
+import {reportMatch} from "~/lib/matches";
 import type {Player} from "~/lib/ranking";
 import {
     addPlayer,
@@ -19,7 +23,6 @@ import {
     removePlayer,
     reorderPlayer,
     resetRanking,
-    resolveChallenge,
     sendPendingNotifications,
     setPlayerEmail,
     subscribeToRanking,
@@ -57,15 +60,19 @@ type ModalState =
     | { type: "alert"; message: string }
     | { type: "confirm"; message: string; onConfirm: () => void; onCancel?: () => void };
 
-type TabKey = "ranking" | "retos" | "gestion" | "usuarios" | "bitacora" | "config";
+type TabKey = "ranking" | "historial" | "retos" | "gestion" | "usuarios" | "bitacora" | "config";
 
+// Etiquetas cortas: con siete pestañas, los títulos largos no caben en la columna
+// y se salían del panel.
 const TABS: { key: TabKey; label: string; adminOnly?: boolean }[] = [
-    {key: "ranking", label: "Tabla de Posiciones"},
-    {key: "retos", label: "Panel de Retos", adminOnly: true},
-    {key: "gestion", label: "Gestión de Jugadores", adminOnly: true},
+    {key: "ranking", label: "Ranking"},
+    // El historial lo puede consultar cualquier miembro, no sólo los admins.
+    {key: "historial", label: "Historial"},
+    {key: "retos", label: "Retos", adminOnly: true},
+    {key: "gestion", label: "Jugadores", adminOnly: true},
     {key: "usuarios", label: "Usuarios", adminOnly: true},
     {key: "bitacora", label: "Bitácora", adminOnly: true},
-    {key: "config", label: "Configuración", adminOnly: true},
+    {key: "config", label: "Ajustes", adminOnly: true},
 ];
 
 const EMPTY_STATE: RankingState = {jugadores: [], retosVigentes: [], historial: []};
@@ -112,9 +119,11 @@ export default function RankingSF6() {
         setModal(null);
     }
 
-    // El perfil llega después de la sesión: si el rol deja de ser admin, salimos de la pestaña.
+    // El perfil llega después de la sesión: si el rol deja de ser admin, salimos
+    // sólo de las pestañas reservadas (Historial sí lo ven los miembros).
     useEffect(() => {
-        if (!isAdmin && activeTab !== "ranking") setActiveTab("ranking");
+        const actual = TABS.find((t) => t.key === activeTab);
+        if (actual?.adminOnly && !isAdmin) setActiveTab("ranking");
     }, [activeTab, isAdmin]);
 
     useEffect(() => {
@@ -209,9 +218,9 @@ export default function RankingSF6() {
         });
     }
 
-    function resolverReto(retoId: string, ganadorId: string) {
+    function reportarResultado(report: MatchReport) {
         void run(async () => {
-            await resolveChallenge(retoId, ganadorId);
+            await reportMatch(report);
             dispararNotificaciones();
         });
     }
@@ -407,14 +416,14 @@ export default function RankingSF6() {
 
             {loadError && (
                 <div
-                    className="mx-auto mb-4 w-full max-w-[1200px] shrink-0 rounded-r-md border-l-4 border-[#C3073F] bg-[#C3073F]/10 px-3 py-2 text-sm text-[#ff8095]">
+                    className="mx-auto mb-4 w-full max-w-[1700px] shrink-0 rounded-r-md border-l-4 border-[#C3073F] bg-[#C3073F]/10 px-3 py-2 text-sm text-[#ff8095]">
                     No se pudo cargar el ranking: {loadError}
                 </div>
             )}
 
             {notifyError && (
                 <div
-                    className="mx-auto mb-4 flex w-full max-w-[1200px] shrink-0 items-center justify-between gap-3 rounded-r-md border-l-4 border-[#F0C808] bg-[#F0C808]/10 px-3 py-2 text-sm text-[#F0C808]">
+                    className="mx-auto mb-4 flex w-full max-w-[1700px] shrink-0 items-center justify-between gap-3 rounded-r-md border-l-4 border-[#F0C808] bg-[#F0C808]/10 px-3 py-2 text-sm text-[#F0C808]">
                     <span>
                         El cambio se guardó, pero los correos quedaron pendientes: {notifyError}
                     </span>
@@ -427,16 +436,21 @@ export default function RankingSF6() {
                 </div>
             )}
 
-            <div className="mx-auto grid w-full min-h-0 flex-1 max-w-[1200px] grid-cols-[2fr_1fr] gap-6">
+            {/* minmax(0,…) evita que la tabla del ranking, al ser ancha, empuje y
+                estruje la columna lateral. */}
+            <div
+                className="mx-auto grid w-full min-h-0 flex-1 max-w-[1700px] grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-6">
                 <div className={`${PANEL} flex min-h-0 flex-col ${busy ? "pointer-events-none opacity-60" : ""}`}>
-                    <div className="mb-4 flex shrink-0 gap-1 border-b-2 border-[#4E4E50]">
+                    {/* flex-wrap es la red de seguridad: si alguna vez no caben,
+                        las pestañas bajan de línea en vez de salirse del panel. */}
+                    <div className="mb-4 flex shrink-0 flex-wrap gap-1 border-b-2 border-[#4E4E50]">
                         {visibleTabs.map((tab) => (
                             <motion.button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
                                 whileHover={HOVER}
                                 whileTap={TAP}
-                                className={`relative -mb-0.5 whitespace-nowrap rounded-t-md px-5 py-3 text-xs font-bold uppercase tracking-wide transition-colors duration-200 md:text-sm ${
+                                className={`relative -mb-0.5 whitespace-nowrap rounded-t-md px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide transition-colors duration-200 ${
                                     activeTab === tab.key
                                         ? "bg-white/5 text-[#F0C808]"
                                         : "text-gray-500 hover:bg-white/5 hover:text-gray-200"
@@ -509,7 +523,7 @@ export default function RankingSF6() {
 
                         {activeTab === "retos" && isAdmin && (
                             <div
-                                className="sf6-scroll flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto px-2">
+                                className="sf6-scroll flex min-h-0 flex-1 flex-col items-center gap-4 overflow-auto px-2 pt-2">
                                 <div className="flex flex-wrap items-center justify-center gap-3">
                                     <select className={INPUT} value={challengerId}
                                             onChange={(e) => setChallengerId(e.target.value)}>
@@ -535,8 +549,37 @@ export default function RankingSF6() {
                                                onClick={lanzarReto}>
                                     Lanzar Reto
                                 </motion.button>
+
+                                <div className="mt-2 w-full border-t border-[#4E4E50] pt-4">
+                                    <h3 className={SECTION_TITLE}>Reportar resultados</h3>
+                                    {retosVigentes.length === 0 ? (
+                                        <p className={EMPTY_ITEM}>No hay retos pendientes de reportar.</p>
+                                    ) : (
+                                        <ul className="space-y-3">
+                                            {retosVigentes.map((r) => {
+                                                const retador = jugadores.find((j) => j.id === r.retadorId);
+                                                const retado = jugadores.find((j) => j.id === r.retadoId);
+                                                if (!retador || !retado) return null;
+
+                                                return (
+                                                    <li key={r.id}>
+                                                        <ChallengeReport
+                                                            reto={r}
+                                                            retador={retador}
+                                                            retado={retado}
+                                                            onReport={reportarResultado}
+                                                            onCancel={cancelarReto}
+                                                        />
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    )}
+                                </div>
                             </div>
                         )}
+
+                        {activeTab === "historial" && <MatchHistory jugadores={jugadoresOrdenadosPorRango}/>}
 
                         {activeTab === "gestion" && isAdmin && (
                             <PlayerAdmin
@@ -594,15 +637,12 @@ export default function RankingSF6() {
                                                 </div>
                                                 {isAdmin && (
                                                     <div className="flex flex-wrap gap-1.5">
+                                                        {/* Se reporta en la pestaña Retos, donde se captura
+                                                            también el marcador SF6. */}
                                                         <motion.button whileHover={HOVER} whileTap={TAP}
                                                                        className={BTN_WIN_SM}
-                                                                       onClick={() => resolverReto(r.id, retador.id)}>
-                                                            Gana {retador.nombre}
-                                                        </motion.button>
-                                                        <motion.button whileHover={HOVER} whileTap={TAP}
-                                                                       className={BTN_WIN_SM}
-                                                                       onClick={() => resolverReto(r.id, retado.id)}>
-                                                            Gana {retado.nombre}
+                                                                       onClick={() => setActiveTab("retos")}>
+                                                            Reportar resultado
                                                         </motion.button>
                                                         <motion.button whileHover={HOVER} whileTap={TAP}
                                                                        className={BTN_DANGER_SM}
@@ -628,7 +668,7 @@ export default function RankingSF6() {
                                         Sin actividad reciente.
                                     </motion.li>
                                 ) : (
-                                    historial.slice(0, 7).map((h) => (
+                                    historial.slice(0, 15).map((h) => (
                                         <motion.li
                                             key={h.id}
                                             layout
