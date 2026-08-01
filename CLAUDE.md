@@ -31,6 +31,7 @@ GitHub Pages, backed by Supabase. See README.md for full setup.
 npm run dev         # http://localhost:5173/pa-webapp/  (not /)
 npm run typecheck   # react-router typegen && tsc
 npm run build
+npm test            # jest, pure logic in app/lib
 ```
 
 Run `typecheck` and `build` after changes. Never run dev servers with plain `npm` in a tool that
@@ -60,6 +61,12 @@ supabase/functions/  Edge Functions (Deno, not typechecked by tsconfig)
   `inline-flex items-center` for `min-h-*` to centre their text.
 - **Comments explain why, not what.** The codebase has no narration comments.
 - Business rules belong in Postgres functions, not in components.
+- **Put new pure logic in its own Supabase-free module** (see `score.ts`, `transforms.ts`,
+  `auth-errors.ts`) and add a `*.test.ts` beside it. Logic buried in a component is harder
+  to cover.
+- **Component tests mock the data-access module, never the Supabase client.** `jest.mock`
+  `~/lib/users`, `~/lib/matches` and so on, so `app/lib/supabase.ts` (which uses Vite-only
+  `import.meta.env`) is never loaded. `motion/react` is mapped to `test/motion-stub.tsx`.
 
 ## Security model
 

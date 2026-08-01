@@ -2,6 +2,7 @@ import {useState} from "react";
 import {motion} from "motion/react";
 
 import type {MatchReport} from "~/lib/matches";
+import {parseScore} from "~/lib/score";
 import {HOVER, TAP} from "~/lib/motion";
 import type {Challenge, Player} from "~/lib/ranking";
 import {BTN_DANGER_SM, BTN_PRIMARY, INPUT, LABEL} from "~/lib/theme";
@@ -33,32 +34,19 @@ export function ChallengeReport({reto, retador, retado, onReport, onCancel}: Cha
             return;
         }
 
-        const g = setsGanador.trim();
-        const p = setsPerdedor.trim();
-
-        // El marcador es opcional, pero o se ponen los dos o ninguno.
-        if ((g === "") !== (p === "")) {
-            setError("Escribe los dos marcadores o déjalos vacíos.");
+        const marcador = parseScore(setsGanador, setsPerdedor);
+        if (!marcador.ok) {
+            setError(marcador.error);
             return;
         }
 
-        let sg: number | null = null;
-        let sp: number | null = null;
-
-        if (g !== "") {
-            sg = Number(g);
-            sp = Number(p);
-            if (!Number.isInteger(sg) || !Number.isInteger(sp) || sg < 0 || sp < 0) {
-                setError("Los marcadores deben ser números enteros positivos.");
-                return;
-            }
-            if (sg <= sp) {
-                setError("El ganador debe tener más games que el perdedor.");
-                return;
-            }
-        }
-
-        onReport({challengeId: reto.id, ganadorId, setsGanador: sg, setsPerdedor: sp, notas});
+        onReport({
+            challengeId: reto.id,
+            ganadorId,
+            setsGanador: marcador.setsGanador,
+            setsPerdedor: marcador.setsPerdedor,
+            notas,
+        });
     }
 
     const diasRestantes = Math.ceil((reto.expiraEn - Date.now()) / (1000 * 60 * 60 * 24));

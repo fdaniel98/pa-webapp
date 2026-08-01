@@ -1,4 +1,6 @@
 import {invokeFunction} from "./functions";
+import type {ChallengeRow, HistoryRow, PlayerRow} from "./transforms";
+import {toChallenge, toHistoryEntry, toPlayer} from "./transforms";
 import {supabase} from "./supabase";
 
 export type Player = {
@@ -31,56 +33,6 @@ export type RankingState = {
     retosVigentes: Challenge[];
     historial: HistoryEntry[];
 };
-
-type PlayerRow = {
-    id: string;
-    nombre: string;
-    rango_actual: number;
-    rango_anterior: number;
-    cooldown_hasta: string | null;
-    email: string | null;
-};
-
-type ChallengeRow = {
-    id: string;
-    retador_id: string;
-    retado_id: string;
-    expira_en: string;
-};
-
-type HistoryRow = {
-    id: string;
-    texto: string;
-    created_at: string;
-};
-
-function toPlayer(row: PlayerRow): Player {
-    return {
-        id: row.id,
-        nombre: row.nombre,
-        rangoActual: row.rango_actual,
-        rangoAnterior: row.rango_anterior,
-        cooldownHasta: row.cooldown_hasta ? new Date(row.cooldown_hasta).getTime() : null,
-        email: row.email,
-    };
-}
-
-function toChallenge(row: ChallengeRow): Challenge {
-    return {
-        id: row.id,
-        retadorId: row.retador_id,
-        retadoId: row.retado_id,
-        expiraEn: new Date(row.expira_en).getTime(),
-    };
-}
-
-function toHistoryEntry(row: HistoryRow): HistoryEntry {
-    return {
-        id: row.id,
-        fecha: new Date(row.created_at).toLocaleDateString(),
-        texto: row.texto,
-    };
-}
 
 /** Trae el estado completo del ranking en una sola pasada. */
 export async function fetchRankingState(): Promise<RankingState> {

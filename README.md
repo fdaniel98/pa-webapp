@@ -185,6 +185,62 @@ npm run typecheck
 npm run build
 ```
 
+### Pruebas
+
+```bash
+npm test
+```
+
+```bash
+npm run test:watch
+```
+
+Jest + ts-jest + Testing Library. Los tests viven junto al código que prueban
+(`*.test.ts` / `*.test.tsx`).
+
+**Lógica pura** (`app/lib`): conversión de filas de Postgres (`transforms.ts`), validación
+del marcador SF6 (`score.ts`) y traducción de errores de Supabase (`auth-errors.ts`).
+
+**Componentes** (`app/components`): el formulario de reporte de resultados, la gestión de
+cuentas y el historial con su filtro por jugador.
+
+### Cómo se simulan las llamadas
+
+Jest no entiende `import.meta.env`, que es de Vite y se usa en `app/lib/supabase.ts`. La
+solución no es simular el cliente de Supabase, sino **los módulos de acceso a datos**:
+
+```ts
+jest.mock("~/lib/users", () => ({
+    listProfiles: jest.fn(),
+    createUser: jest.fn(),
+    setProfileRole: jest.fn(),
+    deleteUser: jest.fn(),
+}));
+```
+
+Así `app/lib/supabase.ts` no llega a cargarse nunca, y de paso el test comprueba el contrato
+real del componente: con qué argumentos llama, qué hace cuando la promesa falla y si
+recarga la lista después de escribir.
+
+Los componentes cuyos imports de datos son sólo de tipos (`ChallengeReport`, `PlayerAdmin`)
+no necesitan simulación alguna: `import type` desaparece al compilar.
+
+`motion/react` se sustituye por `test/motion-stub.tsx`, que renderiza el elemento HTML
+equivalente y descarta las props de animación. El paquete se publica como ESM y Jest compila
+a CommonJS; además, las animaciones no son lo que interesa afirmar en un test.
+
+### Qué sigue sin cubrirse
+
+Las funciones que llaman a Supabase (`fetchRankingState`, `reportMatch`...) y las Edge
+Functions, que son Deno. Se verifican contra la base real desde el navegador.
+
+Si más adelante quieres cubrirlas, **Vitest** es la opción natural: usa el mismo pipeline
+que Vite, entiende `import.meta.env` sin configuración y mantiene la misma API
+(`describe` / `it` / `expect`), así que estos tests migran tal cual.
+
+Al añadir lógica nueva, sepárala en un módulo sin Supabase (como `score.ts`) en vez de
+dejarla dentro de un componente: así queda cubierta.
+
 ### Reiniciar los datos para probar
 
 `supabase/reset-test-data.sql` deja el ranking como recién instalado: borra

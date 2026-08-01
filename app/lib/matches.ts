@@ -1,4 +1,6 @@
 import {supabase} from "./supabase";
+import type {MatchRow} from "./transforms";
+import {toMatch} from "./transforms";
 
 export type Match = {
     id: string;
@@ -25,46 +27,10 @@ export type PlayerRecord = {
     games_en_contra: number;
 };
 
-type MatchRow = {
-    id: string;
-    ganador_id: string | null;
-    perdedor_id: string | null;
-    ganador_nombre: string;
-    perdedor_nombre: string;
-    sets_ganador: number | null;
-    sets_perdedor: number | null;
-    puesto_ganador_antes: number;
-    puesto_ganador_despues: number;
-    puesto_perdedor_antes: number;
-    puesto_perdedor_despues: number;
-    notas: string | null;
-    reportado_por_nombre: string | null;
-    created_at: string;
-};
-
 const COLUMNS =
     "id, ganador_id, perdedor_id, ganador_nombre, perdedor_nombre, sets_ganador, sets_perdedor, " +
     "puesto_ganador_antes, puesto_ganador_despues, puesto_perdedor_antes, puesto_perdedor_despues, " +
     "notas, reportado_por_nombre, created_at";
-
-function toMatch(row: MatchRow): Match {
-    return {
-        id: row.id,
-        ganadorId: row.ganador_id,
-        perdedorId: row.perdedor_id,
-        ganadorNombre: row.ganador_nombre,
-        perdedorNombre: row.perdedor_nombre,
-        setsGanador: row.sets_ganador,
-        setsPerdedor: row.sets_perdedor,
-        puestoGanadorAntes: row.puesto_ganador_antes,
-        puestoGanadorDespues: row.puesto_ganador_despues,
-        puestoPerdedorAntes: row.puesto_perdedor_antes,
-        puestoPerdedorDespues: row.puesto_perdedor_despues,
-        notas: row.notas,
-        reportadoPor: row.reportado_por_nombre,
-        createdAt: row.created_at,
-    };
-}
 
 export type MatchFilter = {
     /** Devuelve los enfrentamientos donde el jugador ganó o perdió. */
